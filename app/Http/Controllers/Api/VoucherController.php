@@ -34,7 +34,7 @@ class VoucherController extends Controller
             ->first();
 
         if (!$voucherCode) {
-            return response()->json(['message' => 'Kode voucher tidak ditemukan.'], 404);
+            return response()->json(['message' => 'Kode voucher tidak ditemukan.', 'data' => []], 404);
         }
 
         return new VoucherCodeCheckResource($voucherCode);
