@@ -33,8 +33,14 @@ class VoucherController extends Controller
         $voucher = $voucherCode->voucher;
 
         // --- VALIDASI SINGLE USE ---
-        if (!$voucher->is_multiple_use && $voucherCode->used) {
-            return response()->json(['message' => 'Kode voucher sudah digunakan.', 'data' => []], 400);
+        if (!$voucher->is_multiple_use) {
+            // single use hanya boleh dipakai jika used = false
+            if ($voucherCode->used) {
+                return response()->json([
+                    'message' => 'Kode voucher sudah digunakan.',
+                    'data' => []
+                ], 400);
+            }
         }
 
         // --- VALIDASI MULTI USE ---
