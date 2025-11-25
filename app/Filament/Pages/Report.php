@@ -40,8 +40,7 @@ class Report extends Page
                 $q->where('event_id', $event->id)
             )
             ->where(function ($q) {
-                $q->where('payment_status', 'paid')
-                ->orWhereNotNull('transaction_code');
+                $q->where('payment_status', 'paid');
             })
             ->get();
 
