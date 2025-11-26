@@ -55,7 +55,7 @@ class RegistrationWidget extends BaseWidget
                 $r->categoryTicketType->category->name . ' - ' . $r->categoryTicketType->ticketType->name
             )->each(function ($group, $key) use (&$stats, $eventName) {
                 $count = $group->count();
-                $revenue = $group->sum(fn($r) => $r->categoryTicketType->price ?? 0);
+                $revenue = $group->sum(fn($r) => $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0);
 
                 $stats[] = Stat::make("{$eventName}: {$key}", "Rp " . number_format($revenue, 0, ',', '.'))
                     ->description($count . ' Participants')
