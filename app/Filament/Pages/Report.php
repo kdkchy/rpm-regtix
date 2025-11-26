@@ -47,7 +47,7 @@ class Report extends Page
 
         $this->totalRegistrations = $registrations->count();
         $this->totalRevenue = $registrations->sum(function ($r) {
-            return $r->categoryTicketType->price ?? 0;
+            return $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0;
         });
 
         // Group by category & ticket type
@@ -57,7 +57,7 @@ class Report extends Page
         $this->chartData = [
             'labels' => $data->keys()->toArray(),
             'values' => $data->map(fn($group) => count($group))->values()->toArray(),
-            'revenues' => $data->map(fn($group) => $group->sum(fn($r) => $r->categoryTicketType->price ?? 0))->values()->toArray(),
+            'revenues' => $data->map(fn($group) => $group->sum(fn($r) => $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0))->values()->toArray(),
         ];
 
        $this->dispatch('chartUpdated', [
