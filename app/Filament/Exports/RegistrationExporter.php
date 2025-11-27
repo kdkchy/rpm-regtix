@@ -7,16 +7,18 @@ use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
+use Illuminate\Support\Facades\Log;
 
 class RegistrationExporter extends Exporter
 {
     protected static ?string $model = Registration::class;
-
+    
     public static function getColumns(): array
     {
         return [
             ExportColumn::make('id')
                 ->label('ID'),
+            ExportColumn::make('registration_code')->label('Kode Registrasi'),
             ExportColumn::make('ticketType.name')->label('Tiket'),
             ExportColumn::make('full_name')->label('Nama'),
             ExportColumn::make('email')->label('Email'),
@@ -39,7 +41,7 @@ class RegistrationExporter extends Exporter
             ExportColumn::make('bib_name')->label('Nomer BIB'),
             ExportColumn::make('reg_id')->label('Nomer Registrasi'),
             ExportColumn::make('registration_date')->label('Tanggal Registrasi'),
-            ExportColumn::make('invitation_code')->label('Kode Undangan'),            
+            ExportColumn::make('voucherCode.code')->label('Kode Voucher'),            
         ];
     }
 
