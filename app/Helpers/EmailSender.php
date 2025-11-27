@@ -6,6 +6,7 @@ use Brevo\Client\Api\TransactionalEmailsApi;
 use Brevo\Client\ApiException;
 use Brevo\Client\Configuration;
 use Brevo\Client\Model\SendSmtpEmail;
+use Brevo\Client\Model\SendSmtpEmailCc;
 use Brevo\Client\Model\SendSmtpEmailTo;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Log;
 class EmailSender 
 {
     // send email
-    public function sendEmail($registration, $subject, $template, $overrideEmail = null) {
+    public function sendEmail($registration, $subject, $template, $overrideEmail = null, $overrideCC = null) {
         try {
             $config = Configuration::getDefaultConfiguration()->setApiKey('api-key', env('BREVO_API_KEY'));
 
@@ -80,6 +81,7 @@ class EmailSender
                 'sender' => ['name' => 'RegTix | ' . $event->name, 'email' => env('MAIL_SENDER')],
                 'replyTo' => ['name' => 'RegTix | ' . $event->name, 'email' => env('MAIL_REPLY_TO')],
                 'to' => [new SendSmtpEmailTo(['email' => $overrideEmail ?? $registration->email])], 
+                'cc' => $overrideCC ? [new SendSmtpEmailCc(['email' => $overrideCC])] : null,
                 'htmlContent' => $template,
                 'params' => $params
             ]);
