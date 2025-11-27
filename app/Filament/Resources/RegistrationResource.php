@@ -409,13 +409,17 @@ class RegistrationResource extends Resource
                             ->email()
                             ->required()
                             ->maxLength(225)
-                            ->default(fn ($record) => $record->email)
+                            ->default(fn ($record) => $record->email),
+                        TextInput::make('cc_email_address')
+                            ->label('Email Address')
+                            ->email()
+                            ->maxLength(225)
                         ])
                     ->action(function($record, array $data){
                         $email = new EmailSender();
                         $subject = $record->event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
                         $template = file_get_contents(resource_path('email/templates/e-ticket.html'));
-                        $email->sendEmail($record, $subject, $template, $data['email_address']);
+                        $email->sendEmail($record, $subject, $template, $data['email_address'], $data['cc_email_address']);
 
                         Notification::make()
                             ->title('Email sent successfully!')
@@ -434,10 +438,6 @@ class RegistrationResource extends Resource
                     ->visible(function ($record) {
                         return $record->is_validated;
                     }),
-                Tables\Actions\ViewAction::make()
-                    ->color('success')
-                    ->icon('heroicon-o-eye')
-                    ->label('View'),               
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
