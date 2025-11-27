@@ -41,17 +41,25 @@ class RegistrationController extends Controller
                 ->first();
 
             if ($registran) {
-                $res = $registran->makeHidden('category_ticket_type')->toArray();
-                $res['payment_url'] = $registran->payment_status === 'paid' 
-                    ? "https://regtix.id/payment/finish/{$registran->registration_code}" 
-                    : $registran->payment_url;
+                // Jika payment_url null → delete registrasi agar bisa daftar ulang
+                if (!$registran->payment_url) {
+                    if ($registran->voucherCode) {
+                        $registran->voucherCode->update(['used' => false]);
+                    }
+                    $registran->delete();
+                } else {
+                    $res = $registran->makeHidden('category_ticket_type')->toArray();
+                    $res['payment_url'] = $registran->payment_status === 'paid' 
+                        ? "https://regtix.id/payment/finish/{$registran->registration_code}" 
+                        : $registran->payment_url;
 
-                return response()->json([
-                    'message' => $registran->payment_status === 'paid' 
-                        ? 'Registration exists' 
-                        : 'Registration pending exists',
-                    'data' => $res
-                ], $registran->payment_status === 'paid' ? 201 : 200);
+                    return response()->json([
+                        'message' => $registran->payment_status === 'paid' 
+                            ? 'Registration exists' 
+                            : 'Registration pending exists',
+                        'data' => $res
+                    ], $registran->payment_status === 'paid' ? 201 : 200);
+                }
             }
 
 
