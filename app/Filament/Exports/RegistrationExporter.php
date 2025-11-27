@@ -43,7 +43,10 @@ class RegistrationExporter extends Exporter
             ->formatStateUsing(function(Registration $record){
                 return $record->voucherCode?->voucher?->final_price ?? $record->categoryTicketType?->price ?? 0;
             }),
-            ExportColumn::make('invitation_code')->label('Kode Undangan'),            
+            ExportColumn::make('invitation_code')->label('Kode Voucher')
+            ->formatStateUsing(function(Registration $record){
+                return $record->voucherCode?->voucher?->code ?? "";
+            }),
         ];
     }
 
