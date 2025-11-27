@@ -30,10 +30,10 @@ class MidtransWebhookController extends Controller
         $paymentType = $data['payment_type'];
         $grossAmount = $data['gross_amount'];
 
-        // Remove expired registration
-        if($transactionStatus === 'expire') {
-            Registration::where('registration_code', $originalOrderId)->delete();
-        }
+        // // Remove expired registration
+        // if($transactionStatus === 'expire') {
+        //     Registration::where('registration_code', $originalOrderId)->delete();
+        // }
 
         switch ($transactionStatus) {
             case 'capture':
@@ -42,6 +42,9 @@ class MidtransWebhookController extends Controller
                 break;
             case 'pending':
                 $this->updatePaymentStatus($originalOrderId, $transactionId, 'pending', $transactionTime, $paymentType, $grossAmount);
+                break;
+            case 'expire':
+                $this->updatePaymentStatus($originalOrderId, $transactionId, 'expire', $transactionTime, $paymentType, $grossAmount);
                 break;
             case 'cancel':
                 $this->updatePaymentStatus($originalOrderId, $transactionId, 'cancel', $transactionTime, $paymentType, $grossAmount);
