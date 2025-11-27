@@ -41,30 +41,19 @@ class RegistrationController extends Controller
                 ->first();
 
             if ($registran) {
-                // Jika PAID → return data + payment_url, selesai
-                if ($registran->payment_status === 'paid') {
+                $res = $registran->makeHidden('category_ticket_type')->toArray();
+                $res['payment_url'] = $registran->payment_status === 'paid' 
+                    ? "https://regtix.id/payment/finish/{$registran->registration_code}" 
+                    : $registran->payment_url;
 
-                    $res = $registran->makeHidden('category_ticket_type')->toArray();
-                    $res['payment_url'] = "https://regtix.id/payment/finish/{$registran->registration_code}";
-
-                    return response()->json([
-                        'message' => 'Registration exists',
-                        'data' => $res
-                    ], 201);
-                }
-
-                // Jika PENDING → reset voucher + delete registran
-                if ($registran->payment_status === 'pending') {
-
-                    if ($registran->voucherCode) {
-                        $registran->voucherCode->update([
-                            'used' => false
-                        ]);
-                    }
-
-                    $registran->delete();
-                }
+                return response()->json([
+                    'message' => $registran->payment_status === 'paid' 
+                        ? 'Registration exists' 
+                        : 'Registration pending exists',
+                    'data' => $res
+                ], $registran->payment_status === 'paid' ? 201 : 200);
             }
+
 
             // Check remaining quota
 
