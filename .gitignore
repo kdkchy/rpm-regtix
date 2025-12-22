@@ -21,3 +21,19 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Dokumentasi dan file utility
+*.md
+!README.md
+*.sql
+*.sh
+*.xml
+*.log
+*.txt
+
+# PHP utility scripts di root folder
+ADD_*.php
+CHECK_*.php
+FIX_*.php
+UPDATE_*.php
+RUN_*.php

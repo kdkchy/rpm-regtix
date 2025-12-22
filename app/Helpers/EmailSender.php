@@ -2,6 +2,7 @@
 
 namespace App\Helpers;
 
+use App\Models\EmailLog;
 use Brevo\Client\Api\TransactionalEmailsApi;
 use Brevo\Client\ApiException;
 use Brevo\Client\Configuration;
@@ -88,8 +89,68 @@ class EmailSender
 
             $result = $apiInstance->sendTransacEmail($sendSmtpEmail);
             Log::info($result);
+
+            // Extract messageId from response
+            $messageId = null;
+            if (method_exists($result, 'getMessageId')) {
+                $messageId = $result->getMessageId();
+            } elseif (isset($result->messageId)) {
+                $messageId = $result->messageId;
+            } elseif (method_exists($result, 'toArray')) {
+                $resultArray = $result->toArray();
+                $messageId = $resultArray['messageId'] ?? $resultArray['message-id'] ?? null;
+            }
+
+            // Log warning if messageId not found
+            if (!$messageId) {
+                Log::warning('MessageId not found in Brevo response', [
+                    'result' => is_object($result) && method_exists($result, 'toArray') 
+                        ? $result->toArray() 
+                        : $result
+                ]);
+            }
+
+            // Save email log
+            try {
+                EmailLog::create([
+                    'registration_id' => $registration->id,
+                    'brevo_message_id' => $messageId,
+                    'email' => $overrideEmail ?? $registration->email,
+                    'status' => 'sent',
+                    'sent_at' => now(),
+                    'status_details' => [
+                        'message_id' => $messageId,
+                        'subject' => $subject,
+                        'cc' => $overrideCC,
+                    ],
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Failed to save email log', [
+                    'registration_id' => $registration->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         } catch (ApiException $e) {
-            Log::error($e->getMessage());
+            Log::error('Brevo API Error: ' . $e->getMessage(), [
+                'registration_id' => $registration->id,
+                'email' => $overrideEmail ?? $registration->email,
+            ]);
+
+            // Save error log
+            try {
+                EmailLog::create([
+                    'registration_id' => $registration->id,
+                    'email' => $overrideEmail ?? $registration->email,
+                    'status' => 'error',
+                    'error_message' => $e->getMessage(),
+                    'sent_at' => now(),
+                ]);
+            } catch (\Exception $logError) {
+                Log::error('Failed to save error email log', [
+                    'registration_id' => $registration->id,
+                    'error' => $logError->getMessage(),
+                ]);
+            }
         }
     }
 

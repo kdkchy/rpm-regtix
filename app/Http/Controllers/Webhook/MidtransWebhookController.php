@@ -97,10 +97,17 @@ class MidtransWebhookController extends Controller
                 $emailSender->sendEmail($registration, $subject, $template);
             }
             
-            if ($registration->voucherCode && !$registration->voucherCode->voucher->is_multiple_use) {
+            // ==== Mark voucher as used HANYA untuk single use (Bug #3) ====
+            if ($registration->voucherCode) {
+                $voucher = $registration->voucherCode->voucher;
+                
+                // Hanya mark used untuk single use voucher
+                // Multiple use voucher tidak perlu di-mark used, usage dihitung dari registrations
+                if ($voucher && !$voucher->is_multiple_use) {
                 $registration->voucherCode->update([
                     'used' => true
                 ]);
+                }
             }
         }
     }

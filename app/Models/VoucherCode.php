@@ -30,4 +30,17 @@ class VoucherCode extends Model
         // MULTI USE
         return $this->hasMany(Registration::class, 'voucher_code_id');
     }
+
+    /**
+     * Get confirmed/paid registrations only
+     * Used for counting actual voucher usage
+     */
+    public function confirmedRegistrations()
+    {
+        return $this->registrations()
+            ->where(function($query) {
+                $query->whereIn('status', ['confirmed', 'paid'])
+                      ->orWhere('payment_status', 'paid');
+            });
+    }
 }

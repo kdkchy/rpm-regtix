@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\VoucherController;
+use App\Http\Controllers\Webhook\BrevoWebhookController;
 use App\Http\Controllers\Webhook\MidtransWebhookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -18,3 +19,4 @@ Route::post('/register', [RegistrationController::class, 'store']);
 Route::post('/check-registration', [RegistrationController::class, 'checkRegistration']);
 
 Route::post('/midtrans/payment-notification', [MidtransWebhookController::class, 'handle']);
+Route::post('/webhook/brevo/email-events', [BrevoWebhookController::class, 'handle']);

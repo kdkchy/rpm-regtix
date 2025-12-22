@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Widgets\RegistrationRevenueChart;
 use Filament\Pages\Page;
 use App\Models\Registration;
 use App\Models\Event;
@@ -10,27 +9,40 @@ use Filament\Forms\Components\Select;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 
-class Report extends Page
+class NewReport extends Page
 {
-    protected static string $view = 'filament.pages.report';
+    protected static string $view = 'filament.pages.new-report';
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 6;
     protected static ?string $navigationGroup = 'Race Pack Management';
+    protected static ?string $navigationLabel = 'New Event Report';
 
     public array $chartData = [];
     public int $totalRegistrations = 0;
     public float $totalRevenue = 0;
     public ?int $selectedEvent = null;
 
-    public array $jerseyByCategory = [];
     public array $globalStats = [];
     public array $perTicketStats = [];
     public array $communityRanks = [];
     public array $cityRanks = [];
+    public array $jerseyStats = [];
+
     public string $reportGeneratedAt;
 
+    public function mount(): void
+    {
+        $this->reportGeneratedAt = now()->timezone(config('app.timezone', 'Asia/Makassar'))->format('l, d F Y : H.i T');
 
+        $user = Auth::user();
+        $events = $user->role->name === 'superadmin'
+            ? Event::pluck('name', 'id')
+            : $user->events()->pluck('events.name', 'events.id');
 
+        $this->selectedEvent = $events->keys()->first();
+
+        $this->updateReport();
+    }
 
     public function updateReport(): void
     {
@@ -47,25 +59,20 @@ class Report extends Page
 
         /** @var Collection<int, \App\Models\Registration> $registrations */
         $registrations = Registration::with([
-                'categoryTicketType.category', 
+                'categoryTicketType.category.event',
                 'categoryTicketType.ticketType',
-                'voucherCode.voucher'
+                'voucherCode.voucher',
             ])
-            ->whereHas('categoryTicketType.category', fn($q) =>
+            ->whereHas('categoryTicketType.category', fn ($q) =>
                 $q->where('event_id', $event->id)
             )
-            ->where(function ($q) {
-                $q->where('payment_status', 'paid');
-            })
+            ->where('payment_status', 'paid')
             ->get();
 
         // Global totals
         $this->totalRegistrations = $registrations->count();
-        $this->totalRevenue = $registrations->sum(function ($r) {
-            return $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0;
-        });
+        $this->totalRevenue = $registrations->sum(fn ($r) => $this->resolvePrice($r));
 
-        // Global Stats
         $this->globalStats = [
             'total_participants' => $this->totalRegistrations,
             'total_revenue' => $this->totalRevenue,
@@ -79,31 +86,33 @@ class Report extends Page
             ],
         ];
 
-        // Group by category & ticket type
-        $data = $registrations
-            ->groupBy(fn($r) => $r->categoryTicketType->category->name . ' - ' . $r->categoryTicketType->ticketType->name);
+        // Group by Category - TicketType for chart & per ticket stats
+        $grouped = $registrations->groupBy(function ($r) {
+            $category = $r->categoryTicketType?->category?->name ?? '-';
+            $ticket = $r->categoryTicketType?->ticketType?->name ?? '-';
+            $eventName = $r->categoryTicketType?->category?->event?->name;
+
+            return trim(($eventName ? $eventName . ': ' : '') . $category . ' - ' . $ticket);
+        });
 
         $this->chartData = [
-            'labels' => $data->keys()->toArray(),
-            'values' => $data->map(fn($group) => count($group))->values()->toArray(),
-            'revenues' => $data->map(fn($group) => $group->sum(fn($r) => $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0))->values()->toArray(),
+            'labels' => $grouped->keys()->toArray(),
+            'values' => $grouped->map(fn ($group) => $group->count())->values()->toArray(),
+            'revenues' => $grouped->map(
+                fn ($group) => $group->sum(fn ($r) => $this->resolvePrice($r))
+            )->values()->toArray(),
         ];
 
-        // Per Ticket Stats
-        $this->perTicketStats = $data->map(function (Collection $group, string $label) {
+        $this->perTicketStats = $grouped->map(function (Collection $group, string $label) {
             return [
                 'label' => $label,
                 'participants' => $group->count(),
-                'revenue' => $group->sum(fn($r) => $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0),
+                'revenue' => $group->sum(fn ($r) => $this->resolvePrice($r)),
                 'gender' => [
                     'male' => $group->where('gender', 'Male')->count(),
                     'female' => $group->where('gender', 'Female')->count(),
                 ],
-                'jersey_sizes' => $group->whereNotNull('jersey_size')
-                    ->groupBy('jersey_size')
-                    ->map->count()
-                    ->sortKeys()
-                    ->toArray(),
+                'jersey_sizes' => $group->groupBy('jersey_size')->map->count()->sortKeys()->toArray(),
             ];
         })->values()->toArray();
 
@@ -141,60 +150,27 @@ class Report extends Page
             ->values()
             ->toArray();
 
-        // Jersey by category with custom sorting
-        $sizeOrder = ['XS','S','M','L','XL','XXL'];
+        // Jersey stats global, grouped by distance / category and size
+        $this->jerseyStats = $registrations
+            ->filter(fn ($r) => filled($r->jersey_size))
+            ->groupBy(function ($r) {
+                // assume category name roughly corresponds to distance / race type
+                return $r->categoryTicketType?->category?->name ?? 'Unknown';
+            })
+            ->map(function (Collection $group, string $categoryName) {
+                return [
+                    'category' => $categoryName,
+                    'sizes' => $group->groupBy('jersey_size')->map->count()->sortKeys()->toArray(),
+                ];
+            })
+            ->values()
+            ->toArray();
 
-        $this->jerseyByCategory = $registrations
-            ->whereNotNull('jersey_size')
-            ->groupBy(fn($r) => $r->categoryTicketType->category->name)
-            ->map(function ($group) use ($sizeOrder) {
-
-                // hitung jumlah per size
-                $sizes = $group->groupBy('jersey_size')
-                            ->map(fn($g) => $g->count())
-                            ->toArray(); // harus array dulu untuk uksort
-
-                // custom sort berdasarkan prefix
-                uksort($sizes, function($a, $b) use ($sizeOrder) {
-                    $indexA = array_search(
-                        collect($sizeOrder)->first(fn($p) => str_starts_with($a, $p)),
-                        $sizeOrder,
-                        true
-                    );
-                    $indexB = array_search(
-                        collect($sizeOrder)->first(fn($p) => str_starts_with($b, $p)),
-                        $sizeOrder,
-                        true
-                    );
-
-                    $indexA = $indexA === false ? 999 : $indexA;
-                    $indexB = $indexB === false ? 999 : $indexB;
-
-                    return $indexA <=> $indexB;
-                });
-
-                return $sizes;
-            })->toArray();
-
-       $this->dispatch('chartUpdated', [
-            'chartData' => $this->chartData ?? ['labels'=>[], 'values'=>[], 'revenues'=>[]],
-            'jerseySizes' => $this->jerseyByCategory
+        $this->dispatch('chartUpdated', [
+            'chartData' => $this->chartData ?? ['labels' => [], 'values' => [], 'revenues' => []],
         ]);
     }
 
-
-    public function mount(): void
-    {
-        $this->reportGeneratedAt = now()->timezone(config('app.timezone', 'Asia/Makassar'))->format('l, d F Y : H.i T');
-
-        $user = Auth::user();
-        $events = $user->role->name === 'superadmin'
-            ? Event::pluck('name', 'id')
-            : $user->events()->pluck('events.name', 'events.id');
-        $this->selectedEvent =  $events->keys()->first();
-
-        $this->updateReport();
-    }
     protected function getFormSchema(): array
     {
         $user = Auth::user();
@@ -209,7 +185,7 @@ class Report extends Page
                 ->options($events)
                 ->searchable()
                 ->reactive()
-                ->afterStateUpdated(fn() => $this->updateReport())
+                ->afterStateUpdated(fn () => $this->updateReport())
                 ->extraAttributes(['style' => 'max-width:350px;']),
         ];
     }
@@ -219,11 +195,19 @@ class Report extends Page
         $this->chartData = [];
         $this->totalRegistrations = 0;
         $this->totalRevenue = 0;
-        $this->jerseyByCategory = [];
         $this->globalStats = [];
         $this->perTicketStats = [];
         $this->communityRanks = [];
         $this->cityRanks = [];
+        $this->jerseyStats = [];
+    }
+
+    protected function resolvePrice(Registration $registration): float|int
+    {
+        return $registration->voucherCode?->voucher?->final_price
+            ?? $registration->categoryTicketType->price
+            ?? 0;
     }
 }
+
 

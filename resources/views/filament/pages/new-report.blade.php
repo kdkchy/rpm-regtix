@@ -96,73 +96,20 @@
             </div>
         @endif
 
-
-        @if(!empty($this->jerseyByCategory))
-        <!-- Title -->
-        <h2 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-100">
-            Jersey Size Summary
-        </h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6 mt-6">
-            @foreach($this->jerseyByCategory as $category => $sizes)
-                <div class="p-4 bg-white dark:bg-gray-800 shadow rounded-lg">
-                    <!-- Header kategori -->
-                    <h3 class="text-lg font-bold mb-3">{{ $category }}</h3>
-                    <hr class="p-2">
-                    <!-- List size -->
-                    <ul class="space-y-2">
-                        @foreach($sizes as $size => $quantity)
-                            <li class="flex justify-between items-center p-1">
-                                <span class="font-semibold">{{ $size }}</span>
-                                <span class="font-bold">{{ $quantity }}</span>
-                            </li>
-                        @endforeach
-                    </ul>
-
-                    <!-- Total per kategori -->
-                    <div class="mt-3 text-right font-semibold text-gray-800 dark:text-gray-200">
-                        Total: {{ array_sum($sizes) }}
-                    </div>
-                </div>
-            @endforeach
-        </div>
-        @endif
-
         {{-- Chart --}}
         <div class="p-6 bg-white dark:bg-gray-800 shadow rounded-2xl">
             <h3 class="text-gray-700 dark:text-gray-300 text-sm font-semibold mb-4">
                 Registrations & Revenue by Category & Ticket Type
             </h3>
 
-            {{-- Chart Canvas - Hidden saat print --}}
-            <div class="w-full overflow-x-auto no-print">
-                <div class="relative" style="min-width: calc(80px * {{ count($this->chartData['labels'] ?? []) }});">
+            <div class="w-full overflow-x-auto">
+                <div
+                    class="relative"
+                    style="height: 300px; min-width: calc(80px * {{ count($this->chartData['labels'] ?? []) }});"
+                >
                     <canvas id="registrationChart" wire:ignore></canvas>
                 </div>
             </div>
-
-            {{-- Table untuk Print - Hidden di web, visible saat print --}}
-            @if(!empty($this->chartData['labels']))
-                <div class="print-only" style="display: none;">
-                    <table class="w-full border-collapse border border-gray-300">
-                        <thead>
-                            <tr class="bg-gray-100">
-                                <th class="border border-gray-300 px-4 py-2 text-left">Category - Ticket Type</th>
-                                <th class="border border-gray-300 px-4 py-2 text-right">Participants</th>
-                                <th class="border border-gray-300 px-4 py-2 text-right">Revenue</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($this->chartData['labels'] as $index => $label)
-                                <tr>
-                                    <td class="border border-gray-300 px-4 py-2">{{ $label }}</td>
-                                    <td class="border border-gray-300 px-4 py-2 text-right">{{ number_format($this->chartData['values'][$index] ?? 0) }}</td>
-                                    <td class="border border-gray-300 px-4 py-2 text-right">Rp {{ number_format($this->chartData['revenues'][$index] ?? 0, 0, ',', '.') }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
         </div>
 
         {{-- Per Ticket Type Summary --}}
@@ -278,20 +225,20 @@
                 @endif
             </div>
 
-            {{-- Jersey Statistics --}}
+            {{-- Jersey Global Statistics --}}
             <div class="p-4 bg-white dark:bg-gray-800 shadow rounded-lg">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">
                     Jersey Statistics
                 </h3>
-                @if(!empty($this->jerseyByCategory))
+                @if(! empty($this->jerseyStats))
                     <div class="space-y-3 text-sm text-gray-900 dark:text-gray-100">
-                        @foreach($this->jerseyByCategory as $category => $sizes)
+                        @foreach($this->jerseyStats as $jersey)
                             <div>
                                 <p class="font-semibold">
-                                    {{ $category }}
+                                    {{ $jersey['category'] }}
                                 </p>
                                 <dl class="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
-                                    @foreach($sizes as $size => $count)
+                                    @foreach($jersey['sizes'] as $size => $count)
                                         <div class="flex justify-between">
                                             <dt class="text-gray-600 dark:text-gray-300">{{ $size }}</dt>
                                             <dd class="font-semibold text-gray-900 dark:text-gray-100">{{ $count }}</dd>
@@ -310,68 +257,14 @@
         </div>
     </div>
 
-    @push('styles')
-        <style>
-            @media print {
-                /* Hide chart canvas saat print */
-                canvas#registrationChart {
-                    display: none !important;
-                }
-
-                /* Hide elements dengan class print:hidden */
-                .print\:hidden {
-                    display: none !important;
-                }
-
-                /* Hide form selector */
-                form {
-                    display: none !important;
-                }
-
-                /* Hide chart container */
-                .no-print {
-                    display: none !important;
-                }
-
-                /* Show print-only table */
-                .print-only {
-                    display: table !important;
-                }
-
-                /* Optimasi layout untuk print */
-                .break-inside-avoid {
-                    page-break-inside: avoid;
-                    break-inside: avoid;
-                }
-
-                /* Warna hitam putih untuk print */
-                * {
-                    color: black !important;
-                    background: white !important;
-                }
-
-                /* Border untuk tabel */
-                table {
-                    border-collapse: collapse;
-                    width: 100%;
-                }
-
-                th, td {
-                    border: 1px solid #000;
-                    padding: 8px;
-                }
-            }
-        </style>
-    @endpush
-
     @push('scripts')
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script>
             let chartInstance = null;
 
-           function renderChart(chartData) {
+            function renderChart(chartData) {
+                if (!chartData) return;
 
-                if (!chartData) return; // safety
                 const labels = chartData.labels || [];
                 const values = chartData.values || [];
                 const revenues = chartData.revenues || [];
@@ -379,36 +272,71 @@
                 const ctx = document.getElementById('registrationChart');
                 if (!ctx) return;
 
-                if (chartInstance) chartInstance.destroy();
+                if (chartInstance) {
+                    chartInstance.destroy();
+                }
 
                 chartInstance = new Chart(ctx, {
                     data: {
                         labels: labels,
-                        datasets: [                           
-                            { type: 'line', label: 'Revenue (Rp)', data: revenues, borderColor: '#f97316', backgroundColor: '#f97316', tension: 0.3, borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#f97316', yAxisID: 'y1' },
-                            { type: 'bar', label: 'Registrations', data: values, backgroundColor: '#3b82f6', borderRadius: 6, yAxisID: 'y' },
-                        ]
+                        datasets: [
+                            {
+                                type: 'line',
+                                label: 'Revenue (Rp)',
+                                data: revenues,
+                                borderColor: '#f97316',
+                                backgroundColor: '#f97316',
+                                tension: 0.3,
+                                borderWidth: 3,
+                                pointRadius: 4,
+                                pointBackgroundColor: '#f97316',
+                                yAxisID: 'y1',
+                            },
+                            {
+                                type: 'bar',
+                                label: 'Registrations',
+                                data: values,
+                                backgroundColor: '#3b82f6',
+                                borderRadius: 6,
+                                yAxisID: 'y',
+                            },
+                        ],
                     },
                     options: {
                         responsive: true,
                         interaction: { mode: 'index', intersect: false },
                         scales: {
-                            y: { beginAtZero: true, title: { display: true, text: 'Registrations' }, ticks: { precision: 0 } },
-                            y1: { beginAtZero: true, position: 'right', title: { display: true, text: 'Revenue (Rp)' }, grid: { drawOnChartArea: false } }
-                        }
-                    }
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Registrations' },
+                                ticks: { precision: 0 },
+                            },
+                            y1: {
+                                beginAtZero: true,
+                                position: 'right',
+                                title: { display: true, text: 'Revenue (Rp)' },
+                                grid: { drawOnChartArea: false },
+                            },
+                        },
+                    },
                 });
             }
 
-
-            // Listen Livewire event
-            window.addEventListener('chartUpdated', event => {                
-                const chartData = event.detail[0].chartData
+            window.addEventListener('chartUpdated', event => {
+                const chartData = event.detail[0].chartData;
                 renderChart(chartData);
             });
-
-
         </script>
     @endpush
-    
 </x-filament::page>
+
+
+
+
+
+
+
+
+
+
+
