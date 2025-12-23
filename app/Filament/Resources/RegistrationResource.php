@@ -48,7 +48,8 @@ class RegistrationResource extends Resource
     private static function calculateNextRegId(): string
     {
         // Ambil reg_id terakhir (misalnya '001', '002')
-        $lastRegId = Registration::orderByRaw('CAST(reg_id AS UNSIGNED) DESC')->first()->reg_id ?? '000';
+        $lastRegistration = Registration::orderByRaw('CAST(reg_id AS UNSIGNED) DESC')->first();
+        $lastRegId = $lastRegistration?->reg_id ?? '000';
 
 
         // Ambil angka dari reg_id (misalnya '001' => 1)
@@ -70,7 +71,7 @@ class RegistrationResource extends Resource
                 ->relationship('categoryTicketType', 'id')
                 ->getOptionLabelFromRecordUsing(
                     fn($record) =>
-                    $record->category->event->name . ' - ' . $record->category->name . ' - ' . $record->ticketType->name
+                    ($record->category?->event?->name ?? 'N/A') . ' - ' . ($record->category?->name ?? 'N/A') . ' - ' . ($record->ticketType?->name ?? 'N/A')
                 )
                 ->searchable()
                 ->preload(),
@@ -190,12 +191,10 @@ class RegistrationResource extends Resource
                 // Email Status Column
                 TextColumn::make('email_status')
                     ->label('Email Status')
-                    ->icon(fn($record) => $this->getEmailStatusIcon($record))
-                    ->color(fn($record) => $this->getEmailStatusColor($record))
-                    ->tooltip(fn($record) => $this->getEmailStatusTooltip($record))
-                    ->formatStateUsing(fn($record) => $this->getEmailStatusLabel($record))
-                    ->sortable()
-                    ->searchable(),
+                    ->icon(fn($record) => static::getEmailStatusIcon($record))
+                    ->color(fn($record) => static::getEmailStatusColor($record))
+                    ->tooltip(fn($record) => static::getEmailStatusTooltip($record))
+                    ->formatStateUsing(fn($record) => static::getEmailStatusLabel($record)),
                 // Status RPC
                 TextColumn::make('is_validated')
                     ->badge()
@@ -275,10 +274,14 @@ class RegistrationResource extends Resource
                     $query = Event::query();
                 /** @var \App\Models\User $user */
                 $user = Auth::user();
-                if (Auth::user()->role->name !== 'superadmin') {
+                if ($user?->role?->name !== 'superadmin') {
                     // Ambil semua event id yang dimiliki user
-                    $eventIds =  $user->events()->pluck('events.id')->toArray();
-                    $query->whereIn('id', $eventIds);
+                    $eventIds = $user?->events()->pluck('events.id')->toArray() ?? [];
+                    if (!empty($eventIds)) {
+                        $query->whereIn('id', $eventIds);
+                    } else {
+                        $query->whereRaw('1 = 0'); // Return empty if no events
+                    }
                 }
 
                 return $query->pluck('name', 'id')->toArray();
@@ -306,8 +309,11 @@ class RegistrationResource extends Resource
                         });
                     }
 
-                if ($user->role->name !== 'superadmin') {
-                    $eventIds = $user->events()->pluck('events.id')->toArray();
+                if ($user?->role?->name !== 'superadmin') {
+                    $eventIds = $user?->events()->pluck('events.id')->toArray() ?? [];
+                    if (empty($eventIds)) {
+                        return [];
+                    }
 
                     $query->whereHas('category.event', function ($q) use ($eventIds) {
                         $q->whereIn('id', $eventIds);
@@ -402,7 +408,7 @@ class RegistrationResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ExportBulkAction::make()
-                    ->visible(fn(): bool => in_array(Auth::user()->role->name, ['superadmin', 'admin']))
+                    ->visible(fn(): bool => in_array(Auth::user()?->role?->name, ['superadmin', 'admin']))
                     ->label('Export Selected')
                     ->exporter(RegistrationExporter::class)
                     ->filename('registrations-' . now()->format('Y-m-d-his'))
@@ -419,7 +425,7 @@ class RegistrationResource extends Resource
     /**
      * Get email status icon based on latest email log.
      */
-    private function getEmailStatusIcon($record): ?string
+    private static function getEmailStatusIcon($record): ?string
     {
         $emailLog = $record->latestEmailLog;
         
@@ -440,7 +446,7 @@ class RegistrationResource extends Resource
     /**
      * Get email status color based on latest email log.
      */
-    private function getEmailStatusColor($record): string
+    private static function getEmailStatusColor($record): string
     {
         $emailLog = $record->latestEmailLog;
         
@@ -460,7 +466,7 @@ class RegistrationResource extends Resource
     /**
      * Get email status label.
      */
-    private function getEmailStatusLabel($record): string
+    private static function getEmailStatusLabel($record): string
     {
         $emailLog = $record->latestEmailLog;
         
@@ -483,7 +489,7 @@ class RegistrationResource extends Resource
     /**
      * Get email status tooltip with details.
      */
-    private function getEmailStatusTooltip($record): ?string
+    private static function getEmailStatusTooltip($record): ?string
     {
         $emailLog = $record->latestEmailLog;
         
@@ -491,7 +497,7 @@ class RegistrationResource extends Resource
             return 'Belum ada log email';
         }
 
-        $tooltip = "Status: {$this->getEmailStatusLabel($record)}\n";
+        $tooltip = "Status: " . static::getEmailStatusLabel($record) . "\n";
         
         if ($emailLog->sent_at) {
             $tooltip .= "Sent: " . Carbon::parse($emailLog->sent_at)->format('d M Y H:i') . "\n";
@@ -537,12 +543,15 @@ class RegistrationResource extends Resource
         $query = parent::getEloquentQuery()->with('latestEmailLog');
 
         // Admin bisa lihat semua
-        if ($user->role->name === 'superadmin') {
+        if ($user?->role?->name === 'superadmin') {
             return $query;
         }
 
         // User biasa hanya lihat event tertentu
-        $eventIds = $user->events()->pluck('events.id')->toArray();
+        $eventIds = $user?->events()->pluck('events.id')->toArray() ?? [];
+        if (empty($eventIds)) {
+            return $query->whereRaw('1 = 0'); // Return empty if no events
+        }
 
         return $query->whereHas('categoryTicketType.category.event', function ($query) use ($eventIds) {
             $query->whereIn('events.id', $eventIds);
