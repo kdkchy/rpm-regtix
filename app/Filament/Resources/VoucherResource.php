@@ -50,7 +50,7 @@ class VoucherResource extends Resource
 
                     $query = CategoryTicketType::query();
 
-                if ($user->role->name !== 'superadmin') {
+                if ($user?->role?->name !== 'superadmin') {
                     $userIds = $user->events()->pluck('events.id')->toArray();
                     $query->whereHas('category.event', function ($query) use ($userIds) {
                         $query->whereIn('events.id', $userIds);
@@ -222,12 +222,20 @@ class VoucherResource extends Resource
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
+        if (!$user) {
+            return parent::getEloquentQuery()->whereRaw('1 = 0'); // Return empty result if no user
+        }
+
         // Admin lihat semua
-        if ($user->role->name === 'superadmin') {
+        if ($user?->role?->name === 'superadmin') {
             return parent::getEloquentQuery();
         }
 
-        $eventIds = $user->events()->pluck('events.id')->toArray();
+        $eventIds = $user?->events()->pluck('events.id')->toArray() ?? [];
+        
+        if (empty($eventIds)) {
+            return parent::getEloquentQuery()->whereRaw('1 = 0'); // Return empty if no events
+        }
 
         return parent::getEloquentQuery()
             ->whereHas('categoryTicketType.category.event', function ($query) use ($eventIds) {
