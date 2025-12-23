@@ -15,21 +15,17 @@ jobs:
     - name: Setup SSH and Deploy
       uses: appleboy/ssh-action@v0.1.10
       with:
-        host: 69.62.83.32
-        username: root
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         port: 22
         script: |
-          # Masuk ke direktori aplikasi
-          cd /var/www/rpm
+          cd /home/${{ secrets.SSH_USERNAME }}/regtix/be
 
-          # Update code dengan git pull
           git pull origin main
 
-          # Jalankan composer install
-          sudo -u www-data composer install --no-dev --optimize-autoloader
-
-          # Jalankan migrasi dan cache Laravel
+          composer install --no-dev --optimize-autoloader
+          
           php artisan migrate
           php artisan config:clear
           php artisan cache:clear
