@@ -190,10 +190,10 @@ class RegistrationResource extends Resource
                 // Email Status Column
                 TextColumn::make('email_status')
                     ->label('Email Status')
-                    ->icon(fn($record) => $this->getEmailStatusIcon($record))
-                    ->color(fn($record) => $this->getEmailStatusColor($record))
-                    ->tooltip(fn($record) => $this->getEmailStatusTooltip($record))
-                    ->formatStateUsing(fn($record) => $this->getEmailStatusLabel($record))
+                    ->icon(fn($record) => self::getEmailStatusIcon($record))
+                    ->color(fn($record) => self::getEmailStatusColor($record))
+                    ->tooltip(fn($record) => self::getEmailStatusTooltip($record))
+                    ->formatStateUsing(fn($record) => self::getEmailStatusLabel($record))
                     ->sortable()
                     ->searchable(),
                 // Status RPC
@@ -419,7 +419,7 @@ class RegistrationResource extends Resource
     /**
      * Get email status icon based on latest email log.
      */
-    private function getEmailStatusIcon($record): ?string
+    private static function getEmailStatusIcon($record): ?string
     {
         $emailLog = $record->latestEmailLog;
         
@@ -440,7 +440,7 @@ class RegistrationResource extends Resource
     /**
      * Get email status color based on latest email log.
      */
-    private function getEmailStatusColor($record): string
+    private static function getEmailStatusColor($record): string
     {
         $emailLog = $record->latestEmailLog;
         
@@ -460,7 +460,7 @@ class RegistrationResource extends Resource
     /**
      * Get email status label.
      */
-    private function getEmailStatusLabel($record): string
+    private static function getEmailStatusLabel($record): string
     {
         $emailLog = $record->latestEmailLog;
         
@@ -483,7 +483,7 @@ class RegistrationResource extends Resource
     /**
      * Get email status tooltip with details.
      */
-    private function getEmailStatusTooltip($record): ?string
+    private static function getEmailStatusTooltip($record): ?string
     {
         $emailLog = $record->latestEmailLog;
         
@@ -491,7 +491,7 @@ class RegistrationResource extends Resource
             return 'Belum ada log email';
         }
 
-        $tooltip = "Status: {$this->getEmailStatusLabel($record)}\n";
+        $tooltip = "Status: " . self::getEmailStatusLabel($record) . "\n";
         
         if ($emailLog->sent_at) {
             $tooltip .= "Sent: " . Carbon::parse($emailLog->sent_at)->format('d M Y H:i') . "\n";
