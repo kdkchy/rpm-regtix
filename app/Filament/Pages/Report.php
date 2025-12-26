@@ -22,6 +22,8 @@ class Report extends Page
     public ?int $selectedEvent = null;
 
     public array $jerseyByCategory = [];
+    
+    public string $reportGeneratedAt;
 
 
 
@@ -106,6 +108,8 @@ class Report extends Page
 
     public function mount(): void
     {
+        $this->reportGeneratedAt = now()->format('d M Y H:i:s');
+        
         $user = Auth::user();
         $events = $user->role->name === 'superadmin'
             ? Event::pluck('name', 'id')
