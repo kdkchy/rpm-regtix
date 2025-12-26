@@ -37,7 +37,7 @@ class ListRegistrations extends ListRecords
                         ->options(function () {
                             $user = Auth::user();
                             
-                            if ($user?->role?->name === 'superadmin') {
+                            if ($user->role->name === 'superadmin') {
                                 return Event::pluck('name', 'id')->toArray();
                             }
 
@@ -102,7 +102,7 @@ class ListRegistrations extends ListRecords
                 })->modalSubmitActionLabel('Generate BIB')
                 ,
             ExportAction::make('Export')
-                ->visible(fn(): bool => in_array(Auth::user()?->role?->name, ['superadmin', 'admin']))
+                ->visible(fn(): bool => in_array(Auth::user()->role->name, ['superadmin', 'admin']))
                 ->exporter(RegistrationExporter::class)
                 ->icon('heroicon-o-arrow-down-tray')
                 ->fileName('registration-' . now()->format('Y-m-d-his'))

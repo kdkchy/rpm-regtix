@@ -71,7 +71,7 @@ class EmailSender
                 'price' => $this->formatMoney($price),
                 'price_reduction' => '- '.$this->formatMoney($priceReduction),
                 'final_price' => $this->formatMoney($finalPrice),
-                'voucher' => $voucher ? $voucherCode->code : 'No Voucher',
+                'voucher' => ($voucher && $voucherCode) ? $voucherCode->code : 'No Voucher',
                 'year' => Carbon::now()->year,
                 'ig_url' => $event->ig_url,
                 'fb_url' => $event->fb_url,

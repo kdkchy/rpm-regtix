@@ -16,11 +16,7 @@ class RegistrationWidget extends BaseWidget
     {
         $user = Auth::user();
 
-        if (!$user) {
-            return [];
-        }
-
-        $allowedEventIds = $user?->role?->name === 'superadmin'
+        $allowedEventIds = $user->role->name === 'superadmin'
             ? Event::where('status', 'OPEN')->pluck('events.id')->toArray() // semua event
             : $user->events()->where('status', 'OPEN')->pluck('events.id')->toArray();
         // Ambil semua registrasi paid
@@ -37,16 +33,16 @@ class RegistrationWidget extends BaseWidget
 
         // Group by "Category - TicketType"
         $data = $registrations
-            ->groupBy(fn($r) => ($r->categoryTicketType?->category?->name ?? '-') . ' - ' . ($r->categoryTicketType?->ticketType?->name ?? '-'));
+            ->groupBy(fn($r) => $r->categoryTicketType->category->name . ' - ' . $r->categoryTicketType->ticketType->name);
 
         $stats = [];
 
-        $registrations->groupBy(fn($r) => $r->categoryTicketType?->category?->event?->name ?? 'Unknown')
+        $registrations->groupBy(fn($r) => $r->categoryTicketType->category->event->name)
         ->each(function ($eventGroup, $eventName) use (&$stats) {
 
             // 1️⃣ Stat total per event
             $totalCount = $eventGroup->count();
-            $totalRevenue = $eventGroup->sum(fn($r) => $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType?->price ?? 0);
+            $totalRevenue = $eventGroup->sum(fn($r) => $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0);
 
             $stats[] = Stat::make("{$eventName}", "Rp " . number_format($totalRevenue, 0, ',', '.'))
                 ->description($totalCount . ' Participants')
@@ -56,10 +52,10 @@ class RegistrationWidget extends BaseWidget
 
             // 2️⃣ Stats per category-ticket type
             $eventGroup->groupBy(fn($r) =>
-                ($r->categoryTicketType?->category?->name ?? '-') . ' - ' . ($r->categoryTicketType?->ticketType?->name ?? '-')
+                $r->categoryTicketType->category->name . ' - ' . $r->categoryTicketType->ticketType->name
             )->each(function ($group, $key) use (&$stats, $eventName) {
                 $count = $group->count();
-                $revenue = $group->sum(fn($r) => $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType?->price ?? 0);
+                $revenue = $group->sum(fn($r) => $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0);
 
                 $stats[] = Stat::make("{$eventName}: {$key}", "Rp " . number_format($revenue, 0, ',', '.'))
                     ->description($count . ' Participants')

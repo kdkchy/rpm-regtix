@@ -89,14 +89,10 @@ class VoucherCodeResource extends Resource
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (!$user) {
-            return parent::getEloquentQuery()->whereRaw('1 = 0'); // Return empty result if no user
-        }
-
         $query = parent::getEloquentQuery();
 
         // Filter berdasarkan user event
-        if ($user?->role?->name !== 'superadmin') {
+        if ($user->role->name !== 'superadmin') {
 
             $userIds = $user->events()->pluck('events.id')->toArray();
 

@@ -23,6 +23,10 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Validation
     Route::post('/validate', [ValidationController::class, 'validate']);
+    
+    // Monitoring
+    Route::get('/monitoring/stats', [\App\Http\Controllers\Rpc\MonitoringController::class, 'stats']);
+    Route::get('/monitoring/stream', [\App\Http\Controllers\Rpc\MonitoringController::class, 'stream']);
 });
 
 

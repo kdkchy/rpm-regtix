@@ -21,14 +21,7 @@ class TicketController extends Controller
         $ticketCode = $request->ticket_code;
 
         // Get authorized event IDs for the authenticated user
-        $user = auth()->user();
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized.',
-            ], 401);
-        }
-        $authorizedEventIds = $user->events()->pluck('events.id')->toArray();
+        $authorizedEventIds = auth()->user()->events()->pluck('events.id')->toArray();
         
         // Validasi pertama: Jika user tidak punya authorized events, return error
         if (empty($authorizedEventIds)) {

@@ -50,11 +50,11 @@ class EventResource extends Resource
                         DateTimePicker::make('start_date')
                             ->required()
                             ->label('Event Start Date')
-                            ->placeholder('Select Start Date'),
+                    ->placeholder('Select Start Date'),
                         DateTimePicker::make('end_date')
                             ->required()
                             ->label('Event End Date')
-                            ->placeholder('Select End Date'),
+                    ->placeholder('Select End Date'),
                 Select::make('status')
                     ->label('Event Status') // Label untuk field
                     ->options(Event::STATUS) // Mengambil nama dan ID event dari model Event
@@ -76,16 +76,17 @@ class EventResource extends Resource
                             ->rows(3),
                         DatePicker::make('registration_start_date')
                             ->label('Registration Start Date')
-                            ->placeholder('Select Registration Start Date'),
+                    ->placeholder('Select Registration Start Date'),
                         DatePicker::make('registration_end_date')
                             ->label('Registration End Date')
-                            ->placeholder('Select Registration End Date'),
+                    ->placeholder('Select Registration End Date'),
                         Textarea::make('description')
+                            ->label('Description')
                             ->label('Description'),
                 DatePicker::make('rpc_start_date')
                     ->label('RPC Start Date'),
                 DatePicker::make('rpc_end_date')
-                    ->label('RPC End Date'),
+                    ->label('RPC Start Date'),
                         TextInput::make('rpc_collection_times')
                             ->label('RPC Collection Times')
                             ->maxLength(255),
@@ -103,7 +104,7 @@ class EventResource extends Resource
                             ->maxLength(255),
                         TextInput::make('fb_url')
                             ->label('Facebook URL')
-                            ->maxLength(255),
+                            ->maxLength(225),
                         TextInput::make('contact_email')
                             ->label('Contact Email')
                             ->email()
@@ -192,7 +193,8 @@ class EventResource extends Resource
                                             ->maxLength(255),
                                         TextInput::make('order')
                                             ->label('Order')
-                                            ->numeric(),
+                                            ->numeric()
+                                            ->maxLength(255),
                                     ])
                                 ->collapsible()
                             ])
@@ -219,6 +221,7 @@ class EventResource extends Resource
                                         ->numeric()
                                         ->label('Distance')
                                         ->step(1)
+                                        ->maxLength(255)
                                         ->suffix('KM'),
                                 ])->columnSpan(1),
 
@@ -299,7 +302,6 @@ class EventResource extends Resource
                     ->searchable()
                     ->sortable(),
             ])
-            ->defaultSort('start_date', 'desc')
             ->filters([
                 //
                 Filter::make('name')
@@ -365,7 +367,7 @@ class EventResource extends Resource
     }
     public static function canViewAny(): bool
     {
-        return in_array(Auth::user()?->role?->name, ['superadmin', 'admin']);
+        return in_array(Auth::user()->role->name, ['superadmin', 'admin']);
     }
 
     public static function getEloquentQuery(): Builder
@@ -374,20 +376,12 @@ class EventResource extends Resource
         $user = Auth::user();
 
         // Admin lihat semua
-        if ($user?->role?->name === 'superadmin') {
+        if ($user->role->name === 'superadmin') {
             return parent::getEloquentQuery();
-        }
-
-        if (!$user) {
-            return parent::getEloquentQuery()->whereRaw('1 = 0'); // Return empty result if no user
         }
 
         $eventIds = $user->events()->pluck('events.id')->toArray();
         // User biasa filter voucher berdasarkan event_id user
-        if (!empty($eventIds)) {
-            return parent::getEloquentQuery()->whereIn('id', $eventIds);
-        } else {
-            return parent::getEloquentQuery()->whereRaw('1 = 0'); // Return empty if no events
-        }
+        return parent::getEloquentQuery()->whereIn('id', $eventIds);
     }
 }

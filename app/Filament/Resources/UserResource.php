@@ -176,20 +176,15 @@ class UserResource extends Resource
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (!$user) {
-            return parent::getEloquentQuery()->whereRaw('1 = 0'); // Return empty result if no user
-        }
-
         // Admin lihat semua
-        if (in_array($user?->role?->name, ['superadmin'])) {
+        if (in_array($user->role->name, ['superadmin'])) {
             return parent::getEloquentQuery();
         }
 
         // User biasa filter voucher berdasarkan event_id user
-        $eventIds = $user->events()->pluck('events.id')->toArray();
         return parent::getEloquentQuery()
-            ->whereHas('events', function ($query) use ($eventIds) {
-                $query->whereIn('events.id', $eventIds);
+            ->whereHas('events', function ($query) use ($user) {
+                $query->whereIn('events.id', $user->events()->pluck('events.id'));
             });
     }
 }

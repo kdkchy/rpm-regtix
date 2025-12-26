@@ -45,19 +45,27 @@ class CleanupUnpaidRegistrations extends Command
         
         foreach ($registrations as $registration) {
             try {
-                // Backup ke registration_failed
-                $service->backupFailedRegistration($registration, 'expired_unpaid');
+                // Backup ke registration_failed first
+                $backup = $service->backupFailedRegistration($registration, 'expired_unpaid');
                 
-                // Delete dari registrations
-                $registration->delete();
-                
-                $count++;
-                $this->info("Backed up and deleted: {$registration->registration_code}");
-                
-                Log::info('Registration cleaned up', [
-                    'registration_code' => $registration->registration_code,
-                    'registration_date' => $registration->registration_date,
-                ]);
+                // Only delete if backup successful
+                if ($backup) {
+                    $registration->delete();
+                    $count++;
+                    $this->info("Backed up and deleted: {$registration->registration_code}");
+                    
+                    Log::info('Registration cleaned up', [
+                        'registration_code' => $registration->registration_code,
+                        'registration_date' => $registration->registration_date,
+                        'backup_id' => $backup->id,
+                    ]);
+                } else {
+                    $errors++;
+                    $this->error("Failed to backup {$registration->registration_code}: Backup returned null");
+                    Log::error('Backup failed - returned null', [
+                        'registration_code' => $registration->registration_code,
+                    ]);
+                }
             } catch (\Exception $e) {
                 $errors++;
                 $this->error("Failed to cleanup {$registration->registration_code}: {$e->getMessage()}");
@@ -66,6 +74,7 @@ class CleanupUnpaidRegistrations extends Command
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
                 ]);
+                // Don't delete if backup failed
             }
         }
         
