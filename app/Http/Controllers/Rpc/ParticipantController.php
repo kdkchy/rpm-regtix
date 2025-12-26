@@ -7,7 +7,6 @@ use App\Http\Requests\Rpc\SearchParticipantRequest;
 use App\Http\Resources\Rpc\ParticipantResource;
 use App\Models\Registration;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Log;
 
 class ParticipantController extends Controller
@@ -16,9 +15,9 @@ class ParticipantController extends Controller
      * Search peserta untuk keperluan validasi
      *
      * @param SearchParticipantRequest $request
-     * @return JsonResponse|AnonymousResourceCollection
+     * @return JsonResponse
      */
-    public function search(SearchParticipantRequest $request): JsonResponse|AnonymousResourceCollection
+    public function search(SearchParticipantRequest $request): JsonResponse
     {
         $keyword = trim($request->keyword);
         $eventId = $request->event_id;
