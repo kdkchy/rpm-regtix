@@ -35,12 +35,12 @@ class ViewRegistration extends EditRecord
                         ->label('Email Address')
                         ->email()
                         ->required()
-                        ->maxLength(225)
+                        ->maxLength(255)
                         ->default(fn ($record) => $record->email),
                     TextInput::make('cc_email_address')
                         ->label('Email Address')
                         ->email()
-                        ->maxLength(225)
+                        ->maxLength(255),
                     ])
                 ->action(function($record, array $data){
                     $email = new EmailSender();

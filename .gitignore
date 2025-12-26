@@ -22,13 +22,18 @@ yarn-error.log
 /.vscode
 /.zed
 
+# Debug dan development files
+**/.cursor/
+**/debug.log
+public/d_/
+*.log
+
 # Dokumentasi dan file utility
 *.md
 !README.md
 *.sql
 *.sh
 *.xml
-*.log
 *.txt
 
 # PHP utility scripts di root folder
@@ -37,3 +42,14 @@ CHECK_*.php
 FIX_*.php
 UPDATE_*.php
 RUN_*.php
+
+# Backup dan file temporary
+*_olehai.php
+*_olehAI.php
+*_backup.php
+*_old.php
+*_temp.php
+
+# GitHub workflows (jika tidak ingin di-track)
+.github/workflows/deploy-manual.yml
+.github/workflows/deploy-main.yml

@@ -24,6 +24,12 @@ class Report extends Page
     public array $jerseyByCategory = [];
     
     public string $reportGeneratedAt;
+    
+    public array $globalStats = [];
+    public array $genderNationalityTable = [];
+    public array $jerseyTable = [];
+    public array $communityRanks = [];
+    public array $cityRanks = [];
 
 
 
@@ -34,6 +40,12 @@ class Report extends Page
             $this->chartData = [];
             $this->totalRegistrations = 0;
             $this->totalRevenue = 0;
+            $this->globalStats = [];
+            $this->genderNationalityTable = [];
+            $this->jerseyTable = [];
+            $this->jerseyByCategory = [];
+            $this->communityRanks = [];
+            $this->cityRanks = [];
             return;
         }
 
@@ -67,6 +79,35 @@ class Report extends Page
 
         $sizeOrder = ['XS','S','M','L','XL','XXL'];
 
+        // Calculate global stats
+        $this->globalStats = [
+            'total_participants' => $this->totalRegistrations,
+            'total_revenue' => $this->totalRevenue,
+        ];
+
+        // Calculate gender & nationality table
+        $this->genderNationalityTable = $data->map(function ($group, $key) {
+            $male = $group->where('gender', 'Male')->count();
+            $female = $group->where('gender', 'Female')->count();
+            $foreigner = $group->where('nationality', '!=', 'Indonesia')->count();
+            
+            return [
+                'ticketType' => $key,
+                'male' => $male,
+                'female' => $female,
+                'foreigner' => $foreigner,
+            ];
+        })->values()->toArray();
+
+        // Add total row
+        $this->genderNationalityTable[] = [
+            'ticketType' => 'Total',
+            'male' => $registrations->where('gender', 'Male')->count(),
+            'female' => $registrations->where('gender', 'Female')->count(),
+            'foreigner' => $registrations->where('nationality', '!=', 'Indonesia')->count(),
+        ];
+
+        // Calculate jersey by category (for backward compatibility)
         $this->jerseyByCategory = $registrations
             ->whereNotNull('jersey_size')
             ->groupBy(fn($r) => $r->categoryTicketType->category->name)
@@ -98,6 +139,117 @@ class Report extends Page
 
                 return $sizes;
             })->toArray();
+
+        // Calculate jersey table (grouped by category & ticket type)
+        $jerseyByCategoryTicketType = $registrations
+            ->whereNotNull('jersey_size')
+            ->groupBy(fn($r) => $r->categoryTicketType->category->name . ' - ' . $r->categoryTicketType->ticketType->name)
+            ->map(function ($group) use ($sizeOrder) {
+                $sizes = $group->groupBy('jersey_size')
+                    ->map(fn($g) => $g->count())
+                    ->toArray();
+
+                uksort($sizes, function($a, $b) use ($sizeOrder) {
+                    $indexA = array_search(
+                        collect($sizeOrder)->first(fn($p) => str_starts_with($a, $p)),
+                        $sizeOrder,
+                        true
+                    );
+                    $indexB = array_search(
+                        collect($sizeOrder)->first(fn($p) => str_starts_with($b, $p)),
+                        $sizeOrder,
+                        true
+                    );
+
+                    $indexA = $indexA === false ? 999 : $indexA;
+                    $indexB = $indexB === false ? 999 : $indexB;
+
+                    return $indexA <=> $indexB;
+                });
+
+                return $sizes;
+            })
+            ->toArray();
+
+        // Get all unique ticket types for jersey table
+        $ticketTypes = $data->keys()->toArray();
+        
+        // Build jersey table data
+        $allSizes = collect($jerseyByCategoryTicketType)
+            ->flatMap(fn($sizes) => array_keys($sizes))
+            ->unique()
+            ->toArray();
+        
+        usort($allSizes, function($a, $b) use ($sizeOrder) {
+            $indexA = array_search(
+                collect($sizeOrder)->first(fn($p) => str_starts_with($a, $p)),
+                $sizeOrder,
+                true
+            );
+            $indexB = array_search(
+                collect($sizeOrder)->first(fn($p) => str_starts_with($b, $p)),
+                $sizeOrder,
+                true
+            );
+            $indexA = $indexA === false ? 999 : $indexA;
+            $indexB = $indexB === false ? 999 : $indexB;
+            return $indexA <=> $indexB;
+        });
+
+        $jerseyTableData = [];
+        foreach ($allSizes as $size) {
+            $row = ['size' => $size];
+            $rowTotal = 0;
+            foreach ($ticketTypes as $ticketType) {
+                $count = $jerseyByCategoryTicketType[$ticketType][$size] ?? 0;
+                $row[$ticketType] = $count;
+                $rowTotal += $count;
+            }
+            $row['totals'] = $rowTotal;
+            $jerseyTableData[] = $row;
+        }
+
+        // Add total row
+        $totalRow = ['size' => 'Total'];
+        $grandTotal = 0;
+        foreach ($ticketTypes as $ticketType) {
+            $total = isset($jerseyByCategoryTicketType[$ticketType]) 
+                ? array_sum($jerseyByCategoryTicketType[$ticketType]) 
+                : 0;
+            $totalRow[$ticketType] = $total;
+            $grandTotal += $total;
+        }
+        $totalRow['totals'] = $grandTotal;
+        $jerseyTableData[] = $totalRow;
+
+        $this->jerseyTable = [
+            'ticketTypes' => $ticketTypes,
+            'data' => $jerseyTableData,
+        ];
+
+        // Calculate community ranks
+        $this->communityRanks = $registrations
+            ->whereNotNull('community_name')
+            ->groupBy('community_name')
+            ->map(fn($group, $name) => [
+                'name' => $name,
+                'count' => $group->count(),
+            ])
+            ->sortByDesc('count')
+            ->values()
+            ->toArray();
+
+        // Calculate city ranks
+        $this->cityRanks = $registrations
+            ->whereNotNull('district')
+            ->groupBy('district')
+            ->map(fn($group, $location) => [
+                'location' => $location,
+                'count' => $group->count(),
+            ])
+            ->sortByDesc('count')
+            ->values()
+            ->toArray();
 
        $this->dispatch('chartUpdated', [
             'chartData' => $this->chartData ?? ['labels'=>[], 'values'=>[], 'revenues'=>[]],
@@ -176,8 +328,8 @@ class Report extends Page
 
         // Calculate gender & nationality table
         $genderNationalityTable = $data->map(function ($group, $key) {
-            $male = $group->where('gender', 'Laki-laki')->count();
-            $female = $group->where('gender', 'Perempuan')->count();
+            $male = $group->where('gender', 'Male')->count();
+            $female = $group->where('gender', 'Female')->count();
             $foreigner = $group->where('nationality', '!=', 'Indonesia')->count();
             
             return [
@@ -191,8 +343,8 @@ class Report extends Page
         // Add total row
         $genderNationalityTable[] = [
             'ticketType' => 'Total',
-            'male' => $registrations->where('gender', 'Laki-laki')->count(),
-            'female' => $registrations->where('gender', 'Perempuan')->count(),
+            'male' => $registrations->where('gender', 'Male')->count(),
+            'female' => $registrations->where('gender', 'Female')->count(),
             'foreigner' => $registrations->where('nationality', '!=', 'Indonesia')->count(),
         ];
 

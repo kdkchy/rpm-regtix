@@ -1,35 +1,134 @@
-name: Deploy Laravel App
+name: Deploy to Staging/Production
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - master
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Setup SSH and Deploy
-      uses: appleboy/ssh-action@v0.1.10
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USERNAME }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        port: 22
-        script: |
-          cd /home/${{ secrets.SSH_USERNAME }}/regtix/be
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, bcmath, pdo_mysql, fileinfo, gd, zip
+          coverage: none
 
-          git pull origin main
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-          composer install --no-dev --optimize-autoloader
-          
-          php artisan migrate
-          php artisan config:clear
-          php artisan cache:clear
-          php artisan route:clear
-          php artisan view:clear
-          php artisan optimize:clear
-          php artisan route:cache
+      - name: Add server to known hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        env:
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PATH: ${{ secrets.SERVER_PATH }}
+        run: |
+          ssh ${SERVER_USER}@${SERVER_HOST} << 'ENDSSH'
+            set -e
+            
+            cd ${SERVER_PATH}
+            
+            echo "=== Starting Deployment ==="
+            
+            # 1. Reset any local changes (SOLUTION 1)
+            echo "Step 1: Resetting local changes..."
+            git fetch origin
+            git reset --hard origin/main || git reset --hard origin/master
+            git clean -fd
+            
+            # 2. Ensure storage and cache directories exist and have correct permissions (SOLUTION 2)
+            echo "Step 2: Setting up storage and cache permissions..."
+            mkdir -p storage/logs
+            mkdir -p storage/framework/cache
+            mkdir -p storage/framework/sessions
+            mkdir -p storage/framework/views
+            mkdir -p bootstrap/cache
+            
+            # Set permissions
+            chmod -R 775 storage bootstrap/cache
+            chown -R www-data:www-data storage bootstrap/cache || chown -R $USER:$USER storage bootstrap/cache
+            
+            # Ensure log file exists and is writable
+            touch storage/logs/laravel.log
+            chmod 664 storage/logs/laravel.log
+            chown www-data:www-data storage/logs/laravel.log || chown $USER:$USER storage/logs/laravel.log
+            
+            # 3. Pull latest code
+            echo "Step 3: Pulling latest code..."
+            git pull origin main || git pull origin master
+            
+            # 4. Install/Update dependencies
+            echo "Step 4: Installing dependencies..."
+            composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+            
+            # 5. Copy .env if not exists
+            echo "Step 5: Checking .env file..."
+            if [ ! -f .env ]; then
+              if [ -f .env.example ]; then
+                cp .env.example .env
+                php artisan key:generate
+              else
+                echo "Warning: .env.example not found!"
+              fi
+            fi
+            
+            # 6. Run migrations
+            echo "Step 6: Running migrations..."
+            php artisan migrate --force --no-interaction
+            
+            # 7. Clear and optimize cache
+            echo "Step 7: Clearing and optimizing cache..."
+            php artisan config:clear
+            php artisan cache:clear
+            php artisan route:clear
+            php artisan view:clear
+            php artisan optimize:clear || true
+            
+            # 8. Rebuild cache for production
+            echo "Step 8: Rebuilding cache..."
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+            
+            # 9. Create storage symlink
+            echo "Step 9: Creating storage symlink..."
+            php artisan storage:link || true
+            
+            # 10. Set final permissions
+            echo "Step 10: Setting final permissions..."
+            chmod -R 775 storage bootstrap/cache
+            chown -R www-data:www-data storage bootstrap/cache || chown -R $USER:$USER storage bootstrap/cache
+            
+            # 11. Restart PHP-FPM (if applicable)
+            echo "Step 11: Restarting PHP-FPM..."
+            sudo systemctl restart php8.3-fpm || sudo service php8.3-fpm restart || echo "PHP-FPM restart skipped"
+            
+            echo "=== Deployment Completed Successfully ==="
+          ENDSSH
+
+      - name: Deployment success notification
+        if: success()
+        run: |
+          echo "✅ Deployment completed successfully!"
+
+      - name: Deployment failure notification
+        if: failure()
+        run: |
+          echo "❌ Deployment failed! Check logs above for details."
+          exit 1
