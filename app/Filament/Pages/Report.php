@@ -52,7 +52,11 @@ class Report extends Page
         $event = Event::find($this->selectedEvent);
         if (! $event) return;
 
-        $registrations = Registration::with(['categoryTicketType.category', 'categoryTicketType.ticketType'])
+        $registrations = Registration::with([
+            'categoryTicketType.category', 
+            'categoryTicketType.ticketType',
+            'voucherCode.voucher'
+        ])
             ->whereHas('categoryTicketType.category', fn($q) =>
                 $q->where('event_id', $event->id)
             )
@@ -61,20 +65,38 @@ class Report extends Page
             })
             ->get();
 
+        // Filter out registrations with incomplete relations first for consistency
+        $validRegistrations = $registrations->filter(fn($r) => 
+            $r->categoryTicketType?->category && $r->categoryTicketType?->ticketType
+        );
 
-        $this->totalRegistrations = $registrations->count();
-        $this->totalRevenue = $registrations->sum(function ($r) {
-            return $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0;
+        $this->totalRegistrations = $validRegistrations->count();
+        
+        // Calculate revenue: use gross_amount (actual payment) if available, otherwise use voucher final_price or categoryTicketType price
+        $this->totalRevenue = $validRegistrations->sum(function ($r) {
+            // Prioritize gross_amount (actual payment received)
+            if ($r->gross_amount !== null && $r->gross_amount > 0) {
+                return (float) $r->gross_amount;
+            }
+            // Fallback to voucher final_price or categoryTicketType price
+            return $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType?->price ?? 0;
         });
 
         // Group by category & ticket type
-        $data = $registrations
+        $data = $validRegistrations
             ->groupBy(fn($r) => $r->categoryTicketType->category->name . ' - ' . $r->categoryTicketType->ticketType->name);
 
         $this->chartData = [
             'labels' => $data->keys()->toArray(),
             'values' => $data->map(fn($group) => count($group))->values()->toArray(),
-            'revenues' => $data->map(fn($group) => $group->sum(fn($r) => $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0))->values()->toArray(),
+            'revenues' => $data->map(fn($group) => $group->sum(function ($r) {
+                // Prioritize gross_amount (actual payment received)
+                if ($r->gross_amount !== null && $r->gross_amount > 0) {
+                    return (float) $r->gross_amount;
+                }
+                // Fallback to voucher final_price or categoryTicketType price
+                return $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType?->price ?? 0;
+            }))->values()->toArray(),
         ];
 
         $sizeOrder = ['XS','S','M','L','XL','XXL'];
@@ -99,16 +121,16 @@ class Report extends Page
             ];
         })->values()->toArray();
 
-        // Add total row
+        // Add total row - use validRegistrations for consistency
         $this->genderNationalityTable[] = [
             'ticketType' => 'Total',
-            'male' => $registrations->where('gender', 'Male')->count(),
-            'female' => $registrations->where('gender', 'Female')->count(),
-            'foreigner' => $registrations->where('nationality', '!=', 'Indonesia')->count(),
+            'male' => $validRegistrations->where('gender', 'Male')->count(),
+            'female' => $validRegistrations->where('gender', 'Female')->count(),
+            'foreigner' => $validRegistrations->where('nationality', '!=', 'Indonesia')->count(),
         ];
 
         // Calculate jersey by category (for backward compatibility)
-        $this->jerseyByCategory = $registrations
+        $this->jerseyByCategory = $validRegistrations
             ->whereNotNull('jersey_size')
             ->groupBy(fn($r) => $r->categoryTicketType->category->name)
             ->map(function ($group) use ($sizeOrder) {
@@ -141,7 +163,7 @@ class Report extends Page
             })->toArray();
 
         // Calculate jersey table (grouped by category & ticket type)
-        $jerseyByCategoryTicketType = $registrations
+        $jerseyByCategoryTicketType = $validRegistrations
             ->whereNotNull('jersey_size')
             ->groupBy(fn($r) => $r->categoryTicketType->category->name . ' - ' . $r->categoryTicketType->ticketType->name)
             ->map(function ($group) use ($sizeOrder) {
@@ -201,7 +223,9 @@ class Report extends Page
             $row = ['size' => $size];
             $rowTotal = 0;
             foreach ($ticketTypes as $ticketType) {
-                $count = $jerseyByCategoryTicketType[$ticketType][$size] ?? 0;
+                $count = isset($jerseyByCategoryTicketType[$ticketType][$size]) 
+                    ? $jerseyByCategoryTicketType[$ticketType][$size] 
+                    : 0;
                 $row[$ticketType] = $count;
                 $rowTotal += $count;
             }
@@ -227,8 +251,8 @@ class Report extends Page
             'data' => $jerseyTableData,
         ];
 
-        // Calculate community ranks
-        $this->communityRanks = $registrations
+        // Calculate community ranks - use validRegistrations for consistency
+        $this->communityRanks = $validRegistrations
             ->whereNotNull('community_name')
             ->groupBy('community_name')
             ->map(fn($group, $name) => [
@@ -239,8 +263,8 @@ class Report extends Page
             ->values()
             ->toArray();
 
-        // Calculate city ranks
-        $this->cityRanks = $registrations
+        // Calculate city ranks - use validRegistrations for consistency
+        $this->cityRanks = $validRegistrations
             ->whereNotNull('district')
             ->groupBy('district')
             ->map(fn($group, $location) => [
@@ -293,6 +317,16 @@ class Report extends Page
     {
         $event = Event::findOrFail($eventId);
         
+        // Authorization check: verify user has access to this event
+        $user = Auth::user();
+        $authorizedEventIds = $user->role->name === 'superadmin'
+            ? Event::pluck('id')->toArray()
+            : $user->events()->pluck('events.id')->toArray();
+        
+        if (!in_array($event->id, $authorizedEventIds)) {
+            abort(403, 'Anda tidak memiliki akses ke event ini.');
+        }
+        
         // Get all paid registrations for this event
         $registrations = Registration::with([
             'categoryTicketType.category', 
@@ -305,10 +339,22 @@ class Report extends Page
             ->where('payment_status', 'paid')
             ->get();
 
+        // Filter out registrations with incomplete relations first for consistency
+        $validRegistrations = $registrations->filter(fn($r) => 
+            $r->categoryTicketType?->category && $r->categoryTicketType?->ticketType
+        );
+
         // Calculate global stats
-        $totalRegistrations = $registrations->count();
-        $totalRevenue = $registrations->sum(function ($r) {
-            return $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0;
+        $totalRegistrations = $validRegistrations->count();
+        
+        // Calculate revenue: use gross_amount (actual payment) if available, otherwise use voucher final_price or categoryTicketType price
+        $totalRevenue = $validRegistrations->sum(function ($r) {
+            // Prioritize gross_amount (actual payment received)
+            if ($r->gross_amount !== null && $r->gross_amount > 0) {
+                return (float) $r->gross_amount;
+            }
+            // Fallback to voucher final_price or categoryTicketType price
+            return $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType?->price ?? 0;
         });
 
         $globalStats = [
@@ -317,13 +363,20 @@ class Report extends Page
         ];
 
         // Calculate chart data (same as updateReport)
-        $data = $registrations
+        $data = $validRegistrations
             ->groupBy(fn($r) => $r->categoryTicketType->category->name . ' - ' . $r->categoryTicketType->ticketType->name);
 
         $chartData = [
             'labels' => $data->keys()->toArray(),
             'values' => $data->map(fn($group) => count($group))->values()->toArray(),
-            'revenues' => $data->map(fn($group) => $group->sum(fn($r) => $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0))->values()->toArray(),
+            'revenues' => $data->map(fn($group) => $group->sum(function ($r) {
+                // Prioritize gross_amount (actual payment received)
+                if ($r->gross_amount !== null && $r->gross_amount > 0) {
+                    return (float) $r->gross_amount;
+                }
+                // Fallback to voucher final_price or categoryTicketType price
+                return $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType?->price ?? 0;
+            }))->values()->toArray(),
         ];
 
         // Calculate gender & nationality table
@@ -340,17 +393,17 @@ class Report extends Page
             ];
         })->values()->toArray();
 
-        // Add total row
+        // Add total row - use validRegistrations for consistency
         $genderNationalityTable[] = [
             'ticketType' => 'Total',
-            'male' => $registrations->where('gender', 'Male')->count(),
-            'female' => $registrations->where('gender', 'Female')->count(),
-            'foreigner' => $registrations->where('nationality', '!=', 'Indonesia')->count(),
+            'male' => $validRegistrations->where('gender', 'Male')->count(),
+            'female' => $validRegistrations->where('gender', 'Female')->count(),
+            'foreigner' => $validRegistrations->where('nationality', '!=', 'Indonesia')->count(),
         ];
 
         // Calculate jersey table
         $sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-        $jerseyByCategory = $registrations
+        $jerseyByCategory = $validRegistrations
             ->whereNotNull('jersey_size')
             ->groupBy(fn($r) => $r->categoryTicketType->category->name . ' - ' . $r->categoryTicketType->ticketType->name)
             ->map(function ($group) use ($sizeOrder) {
@@ -410,7 +463,9 @@ class Report extends Page
             $row = ['size' => $size];
             $rowTotal = 0;
             foreach ($ticketTypes as $ticketType) {
-                $count = $jerseyByCategory[$ticketType][$size] ?? 0;
+                $count = isset($jerseyByCategory[$ticketType][$size]) 
+                    ? $jerseyByCategory[$ticketType][$size] 
+                    : 0;
                 $row[$ticketType] = $count;
                 $rowTotal += $count;
             }
@@ -436,8 +491,8 @@ class Report extends Page
             'data' => $jerseyTableData,
         ];
 
-        // Calculate community ranks
-        $communityRanks = $registrations
+        // Calculate community ranks - use validRegistrations for consistency
+        $communityRanks = $validRegistrations
             ->whereNotNull('community_name')
             ->groupBy('community_name')
             ->map(fn($group, $name) => [
@@ -448,8 +503,8 @@ class Report extends Page
             ->values()
             ->toArray();
 
-        // Calculate city ranks
-        $cityRanks = $registrations
+        // Calculate city ranks - use validRegistrations for consistency
+        $cityRanks = $validRegistrations
             ->whereNotNull('district')
             ->groupBy('district')
             ->map(fn($group, $location) => [

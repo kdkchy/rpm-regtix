@@ -13,7 +13,7 @@ Route::get('/admin/registrations/{registration}/print', function ($registration)
     return view('print.registration', compact('registration'));
 })->name('registration.print');
 
-Route::get('/admin/report/{event}/print-xml', function ($eventId) {
+Route::get('/admin/report/{eventId}/print-xml', function ($eventId) {
     $report = new \App\Filament\Pages\Report();
     return $report->printXml($eventId);
 })->name('report.print-xml');

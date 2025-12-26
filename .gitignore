@@ -49,7 +49,3 @@ RUN_*.php
 *_backup.php
 *_old.php
 *_temp.php
-
-# GitHub workflows (jika tidak ingin di-track)
-.github/workflows/deploy-manual.yml
-.github/workflows/deploy-main.yml
