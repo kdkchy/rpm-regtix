@@ -110,6 +110,13 @@ class Registration extends Model
         return $this->belongsToMany(Campaign::class, 'campaign_registration')->withPivot('status')->withTimestamps();
     }
 
+    public function emailAnnouncements()
+    {
+        return $this->belongsToMany(EmailAnnouncement::class, 'email_announcement_registration')
+            ->withPivot('status', 'email_log_id', 'error_message', 'sent_at')
+            ->withTimestamps();
+    }
+
     public function voucherCode()
     {
         return $this->belongsTo(VoucherCode::class, 'voucher_code_id');

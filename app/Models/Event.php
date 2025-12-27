@@ -63,6 +63,11 @@ class Event extends Model
         return $this->hasMany(Campaign::class);
     }
 
+    public function emailAnnouncements()
+    {
+        return $this->hasMany(EmailAnnouncement::class);
+    }
+
     public function categories()
     {
         return $this->hasMany(Category::class);
