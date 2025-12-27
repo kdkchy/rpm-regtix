@@ -527,4 +527,3 @@ class Report extends Page
         ]);
     }
 }
-
