@@ -69,35 +69,67 @@ class MidtransWebhookController extends Controller
     private function updatePaymentStatus(string $originalOrderId, string $transactionId, string $status, string $transactionTime, string $paymentType, $grossAmount): void
     {
         $registration = Registration::where('registration_code', $originalOrderId)->first();
+        
+        if (!$registration) {
+            Log::warning('Registration not found for webhook', [
+                'order_id' => $originalOrderId,
+                'transaction_id' => $transactionId,
+                'status' => $status
+            ]);
+            return;
+        }
+
+        // Only execute count query after confirming registration exists
         $count = Registration::where('status', 'confirmed')
             ->whereHas('categoryTicketType.category.event', function ($q) use ($registration) {
-                $q->where('event_id', $registration->categoryTicketType->category->event->id);
+                $categoryTicketType = $registration->categoryTicketType;
+                if ($categoryTicketType && $categoryTicketType->category && $categoryTicketType->category->event) {
+                    $q->where('event_id', $categoryTicketType->category->event->id);
+                }
             })
             ->count();
         $regIdGenerator = new GenerateBib();
         $regId = $regIdGenerator->generateRegId($count);
-        if($registration){
-            $qrGenerator = new QrUtils();
-            $qrPath = $qrGenerator->generateQr($registration);
-            $registration->update([                
-                'status' => 'confirmed',
-                'payment_status' => $status,
-                'transaction_code' => $transactionId,
-                'reg_id' => $regId,
-                'paid_at' => $transactionTime,
-                'payment_type' => $paymentType,
-                'gross_amount' => $grossAmount,
-                'qr_code_path' => $qrPath,
-            ]);
+        
+        $qrGenerator = new QrUtils();
+        $qrPath = $qrGenerator->generateQr($registration);
+        $registration->update([                
+            'status' => 'confirmed',
+            'payment_status' => $status,
+            'transaction_code' => $transactionId,
+            'reg_id' => $regId,
+            'paid_at' => $transactionTime,
+            'payment_type' => $paymentType,
+            'gross_amount' => $grossAmount,
+            'qr_code_path' => $qrPath,
+        ]);
 
-            if($status === 'paid'){
-                $emailSender = new EmailSender();
-                $subject = $registration->categoryTicketType->category->event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
-                $template = file_get_contents(resource_path('email/templates/e-ticket.html'));
-                $emailSender->sendEmail($registration, $subject, $template);
+        if($status === 'paid'){
+            $emailSender = new EmailSender();
+            $event = $registration->categoryTicketType?->category?->event;
+            if ($event) {
+                $subject = $event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
+                $templatePath = resource_path('email/templates/e-ticket.html');
+                if (file_exists($templatePath)) {
+                    $template = file_get_contents($templatePath);
+                    $emailSender->sendEmail($registration, $subject, $template);
+                } else {
+                    Log::error('Email template not found in webhook', ['path' => $templatePath]);
+                }
+            } else {
+                Log::warning('Event not found for registration in webhook', [
+                    'registration_code' => $originalOrderId
+                ]);
             }
+        }
+        
+        // ==== Mark voucher as used HANYA untuk single use ====
+        if ($registration->voucherCode) {
+            $voucher = $registration->voucherCode->voucher;
             
-            if ($registration->voucherCode && !$registration->voucherCode->voucher->is_multiple_use) {
+            // Hanya mark used untuk single use voucher
+            // Multiple use voucher tidak perlu di-mark used, usage dihitung dari registrations
+            if ($voucher && !$voucher->is_multiple_use) {
                 $registration->voucherCode->update([
                     'used' => true
                 ]);

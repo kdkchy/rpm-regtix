@@ -10,6 +10,7 @@ use App\Models\CategoryTicketType;
 use App\Models\Event;
 use App\Models\Registration;
 use App\Models\TicketType;
+use Carbon\Carbon;
 use Dom\Text;
 use Filament\Actions\Exports\Enums\Contracts\ExportFormat;
 use Filament\Tables\Actions\Action;
@@ -186,19 +187,31 @@ class RegistrationResource extends Resource
     {
         return $table
             ->columns([
+                // Email Status Column
+                TextColumn::make('email_status')
+                    ->label('Email Status')
+                    ->icon(fn($record) => self::getEmailStatusIcon($record))
+                    ->color(fn($record) => self::getEmailStatusColor($record))
+                    ->tooltip(fn($record) => self::getEmailStatusTooltip($record))
+                    ->formatStateUsing(fn($record) => self::getEmailStatusLabel($record))
+                    ->sortable()
+                    ->searchable(),
+                // Status RPC
                 TextColumn::make('is_validated')
                     ->badge()
                     ->icon(fn($record) => $record->is_validated ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
                     ->formatStateUsing(fn($state) => $state ? 'Validated' : 'Not Validated')
                     ->color(fn($record) => $record->is_validated ? 'success' : 'danger')
-                    ->label('Status')
+                    ->label('Status RPC')
                     ->sortable()
                     ->searchable(),
+                // Registration Date
                 TextColumn::make('registration_date')
                     ->label('Registration Date')
                     ->sortable()
                     ->searchable()
                     ->dateTime(),
+                // Payment Status
                 TextColumn::make('payment_status')
                     ->label('Payment Status')
                     ->badge()
@@ -207,93 +220,39 @@ class RegistrationResource extends Resource
                     ->color(fn($record) => $record->payment_status === 'paid' ? 'success' : 'danger')
                     ->searchable()
                     ->sortable(),
+                // Voucher Code
                 TextColumn::make('voucherCode.code')
                     ->label('Voucher Code')
                     ->sortable()
                     ->searchable(),
-            TextColumn::make('registration_code')
-                ->label('Registration Code')
-                ->sortable()
-                ->searchable(),
+                // Ticket Code
+                TextColumn::make('registration_code')
+                    ->label('Ticket Code')
+                    ->sortable()
+                    ->searchable(),
+                // Full Name
                 TextColumn::make('full_name')
                     ->label('Full Name')
                     ->sortable()
                     ->searchable(),
+                // Email
                 TextColumn::make('email')
                     ->label('Email')
                     ->sortable()
                     ->searchable(),
+                // Phone
                 TextColumn::make('phone')
                     ->label('Phone')
                     ->sortable()
                     ->searchable(),
+                // Gender
                 TextColumn::make('gender')
                     ->label('Gender')
                     ->sortable()
                     ->searchable(),
-                TextColumn::make('place_of_birth')
-                    ->label('Place of Birth')
-                    ->sortable()
-                    ->searchable(),
-                TextColumn::make('dob')
-                    ->label('Date of Birth')
-                    ->sortable()
-                    ->searchable()
-                    ->date(),
-                TextColumn::make('address')
-                    ->label('Address')
-                    ->sortable()
-                    ->searchable(),
-                TextColumn::make('district')
-                    ->label('District')
-                    ->sortable()
-                    ->searchable(),
-                TextColumn::make('province')
-                    ->label('Province')
-                    ->sortable()
-                    ->searchable(),
-                TextColumn::make('country')
-                    ->label('Country')
-                    ->sortable()
-                    ->searchable(),
-                TextColumn::make('id_card_type')
-                    ->label('ID Card Type')
-                    ->sortable()
-                    ->searchable(),
-                TextColumn::make('id_card_number')
-                    ->label('ID Card Number')
-                    ->sortable()
-                    ->searchable(),
-                TextColumn::make('emergency_contact_name')
-                    ->label('Emergency Contact Name')
-                    ->sortable()
-                    ->searchable(),
-                TextColumn::make('emergency_contact_phone')
-                    ->label('Emergency Contact Phone')
-                    ->sortable()
-                    ->searchable(),
-                TextColumn::make('blood_type')
-                    ->label('Blood Type')
-                    ->sortable()
-                    ->searchable(),
-                TextColumn::make('nationality')
-                    ->label('Nationality')
-                    ->sortable()
-                    ->searchable(),
+                // Jersey Size
                 TextColumn::make('jersey_size')
                     ->label('Jersey Size')
-                    ->sortable()
-                    ->searchable(),
-                TextColumn::make('community_name')
-                    ->label('Community Name')
-                    ->sortable()
-                    ->searchable(),
-                TextColumn::make('bib_name')
-                    ->label('Bib Name')
-                    ->sortable()
-                    ->searchable(),
-            TextColumn::make('registration_code')
-                    ->label('Registration ID')
                     ->sortable()
                     ->searchable(),
             ])
@@ -399,7 +358,7 @@ class RegistrationResource extends Resource
             ->filtersFormColumns(3)
             ->actions([
                 Action::make('send_email')
-                    ->label('Send Email')
+                    ->label('Send')
                     ->icon('heroicon-o-envelope')
                     ->modalWidth('sm')
                     ->visible(fn($record) => $record->payment_status === 'paid')
@@ -408,12 +367,12 @@ class RegistrationResource extends Resource
                             ->label('Email Address')
                             ->email()
                             ->required()
-                            ->maxLength(225)
+                            ->maxLength(255)
                             ->default(fn ($record) => $record->email),
                         TextInput::make('cc_email_address')
                             ->label('Email Address')
                             ->email()
-                            ->maxLength(225)
+                            ->maxLength(255)
                         ])
                     ->action(function($record, array $data){
                         $email = new EmailSender();
@@ -457,6 +416,102 @@ class RegistrationResource extends Resource
             ->defaultPaginationPageOption(50);
     }
 
+    /**
+     * Get email status icon based on latest email log.
+     */
+    private static function getEmailStatusIcon($record): ?string
+    {
+        $emailLog = $record->latestEmailLog;
+        
+        if (!$emailLog) {
+            return 'heroicon-o-envelope';
+        }
+
+        return match($emailLog->status) {
+            'delivered' => 'heroicon-o-check-circle',
+            'sent' => 'heroicon-o-clock',
+            'bounced', 'hardBounce', 'invalid' => 'heroicon-o-x-circle',
+            'softBounce' => 'heroicon-o-exclamation-triangle',
+            'error' => 'heroicon-o-exclamation-circle',
+            default => 'heroicon-o-envelope',
+        };
+    }
+
+    /**
+     * Get email status color based on latest email log.
+     */
+    private static function getEmailStatusColor($record): string
+    {
+        $emailLog = $record->latestEmailLog;
+        
+        if (!$emailLog) {
+            return 'gray';
+        }
+
+        return match($emailLog->status) {
+            'delivered' => 'success',
+            'sent' => 'warning',
+            'bounced', 'hardBounce', 'invalid', 'error' => 'danger',
+            'softBounce' => 'warning',
+            default => 'gray',
+        };
+    }
+
+    /**
+     * Get email status label.
+     */
+    private static function getEmailStatusLabel($record): string
+    {
+        $emailLog = $record->latestEmailLog;
+        
+        if (!$emailLog) {
+            return 'No Status';
+        }
+
+        return match($emailLog->status) {
+            'delivered' => 'Delivered',
+            'sent' => 'Sent',
+            'bounced' => 'Bounced',
+            'hardBounce' => 'Hard Bounce',
+            'softBounce' => 'Soft Bounce',
+            'invalid' => 'Invalid',
+            'error' => 'Error',
+            default => 'Unknown',
+        };
+    }
+
+    /**
+     * Get email status tooltip with details.
+     */
+    private static function getEmailStatusTooltip($record): ?string
+    {
+        $emailLog = $record->latestEmailLog;
+        
+        if (!$emailLog) {
+            return 'Belum ada log email';
+        }
+
+        $tooltip = "Status: " . self::getEmailStatusLabel($record) . "\n";
+        
+        if ($emailLog->sent_at) {
+            $tooltip .= "Sent: " . Carbon::parse($emailLog->sent_at)->format('d M Y H:i') . "\n";
+        }
+        
+        if ($emailLog->delivered_at) {
+            $tooltip .= "Delivered: " . Carbon::parse($emailLog->delivered_at)->format('d M Y H:i') . "\n";
+        }
+        
+        if ($emailLog->bounced_at) {
+            $tooltip .= "Bounced: " . Carbon::parse($emailLog->bounced_at)->format('d M Y H:i') . "\n";
+        }
+        
+        if ($emailLog->error_message) {
+            $tooltip .= "Error: {$emailLog->error_message}";
+        }
+
+        return $tooltip;
+    }
+
     public static function getRelations(): array
     {
         return [
@@ -479,17 +534,18 @@ class RegistrationResource extends Resource
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
+        $query = parent::getEloquentQuery()->with('latestEmailLog');
+
         // Admin bisa lihat semua
         if ($user->role->name === 'superadmin') {
-            return parent::getEloquentQuery();
+            return $query;
         }
 
         // User biasa hanya lihat event tertentu
         $eventIds = $user->events()->pluck('events.id')->toArray();
 
-        return parent::getEloquentQuery()
-            ->whereHas('categoryTicketType.category.event', function ($query) use ($eventIds) {
-                $query->whereIn('events.id', $eventIds);
-            });
+        return $query->whereHas('categoryTicketType.category.event', function ($query) use ($eventIds) {
+            $query->whereIn('events.id', $eventIds);
+        });
     }
 }

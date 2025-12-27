@@ -17,7 +17,9 @@ class RegistrationExporter extends Exporter
         return [
             ExportColumn::make('id')
                 ->label('ID'),
-            ExportColumn::make('ticketType.name')->label('Tiket'),
+            ExportColumn::make('registration_code')->label('Kode Tiket'),
+            ExportColumn::make('categoryTicketType.category.name')->label('Kategory'),
+            ExportColumn::make('categoryTicketType.ticketType.name')->label('Tipe Tiket'),
             ExportColumn::make('full_name')->label('Nama'),
             ExportColumn::make('email')->label('Email'),
             ExportColumn::make('phone')->label('Nomor HP'),

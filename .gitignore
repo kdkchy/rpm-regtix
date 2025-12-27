@@ -21,3 +21,31 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Debug dan development files
+**/.cursor/
+**/debug.log
+public/d_/
+*.log
+
+# Dokumentasi dan file utility
+*.md
+!README.md
+*.sql
+*.sh
+*.xml
+*.txt
+
+# PHP utility scripts di root folder
+ADD_*.php
+CHECK_*.php
+FIX_*.php
+UPDATE_*.php
+RUN_*.php
+
+# Backup dan file temporary
+*_olehai.php
+*_olehAI.php
+*_backup.php
+*_old.php
+*_temp.php

@@ -121,4 +121,14 @@ class Registration extends Model
     {
         return $this->belongsTo(VoucherCode::class, 'voucher_code_id');
     }
+
+    public function emailLogs()
+    {
+        return $this->hasMany(EmailLog::class);
+    }
+
+    public function latestEmailLog()
+    {
+        return $this->hasOne(EmailLog::class)->latestOfMany();
+    }
 }
