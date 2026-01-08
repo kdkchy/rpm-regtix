@@ -18,7 +18,16 @@ class ViewRegistration extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            Actions\DeleteAction::make()
+                ->label(fn($record) => $record->payment_status !== 'paid' ? 'Delete (Will be backed up)' : 'Delete')
+                ->modalHeading(fn($record) => $record->payment_status !== 'paid' 
+                    ? 'Delete Unpaid Registration' 
+                    : 'Delete Registration')
+                ->modalDescription(fn($record) => $record->payment_status !== 'paid'
+                    ? 'This unpaid registration will be backed up to registration_backups table before deletion. Are you sure you want to delete this registration?'
+                    : 'WARNING: This is a PAID registration. It will be backed up before deletion. Are you sure you want to proceed?')
+                ->modalSubmitActionLabel('Yes, Delete')
+                ->color(fn($record) => $record->payment_status === 'paid' ? 'danger' : 'warning'),
         ];
     }
 
@@ -77,6 +86,7 @@ class ViewRegistration extends EditRecord
                 ->icon('heroicon-m-check-badge')
                 ->requiresConfirmation()
                 ->color('success')
+                ->visible(fn($record) => !$record->is_validated)
                 ->action(function ($record, $livewire) {
                     // Validasi form terlebih dahulu
                     $data = $livewire->form->getState();
@@ -91,7 +101,25 @@ class ViewRegistration extends EditRecord
                     // Kirim notifikasi "saved"
                     $livewire->getSavedNotification()?->send();
                 }),
+            Action::make('revert_validation')
+                ->label('Revert Validation')
+                ->icon('heroicon-m-x-circle')
+                ->requiresConfirmation()
+                ->modalHeading('Revert Validation')
+                ->modalDescription('Are you sure you want to revert this registration back to "Not Validated" status?')
+                ->modalSubmitActionLabel('Yes, Revert')
+                ->color('warning')
+                ->visible(fn($record) => $record->is_validated)
+                ->action(function ($record) {
+                    $record->update([
+                        'is_validated' => false,
+                    ]);
 
+                    Notification::make()
+                        ->title('Validation reverted successfully')
+                        ->success()
+                        ->send();
+                }),
 
             Action::make('print')
                 ->label('Print')

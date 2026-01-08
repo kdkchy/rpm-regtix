@@ -153,22 +153,22 @@ class UserResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return in_array(Auth::user()?->role?->name, ['superadmin', 'admin']);
+        return Auth::user()?->role?->name === 'superadmin';
     }
 
     public static function canCreate(): bool
     {
-        return in_array(Auth::user()?->role?->name, ['superadmin', 'admin']);
+        return Auth::user()?->role?->name === 'superadmin';
     }
 
     public static function canEdit($record): bool
     {
-        return in_array(Auth::user()?->role?->name, ['superadmin', 'admin']);
+        return Auth::user()?->role?->name === 'superadmin';
     }
 
     public static function canDelete($record): bool
     {
-        return in_array(Auth::user()?->role?->name, ['superadmin', 'admin']);
+        return Auth::user()?->role?->name === 'superadmin';
     }
 
     public static function getEloquentQuery(): Builder

@@ -8,12 +8,7 @@ Route::get('/', function () {
     return redirect('/admin');
 });
 Route::get('/admin/registrations/{registration}/validate', ValidateRegistration::class)->name('registrations.validate');
-Route::get('/admin/registrations/{registration}/print', function ($registration) {
-    $registration = \App\Models\Registration::findOrFail($registration);
+Route::get('/admin/registrations/{registration}/print', function ($id) {
+    $registration = \App\Models\Registration::findOrFail($id);
     return view('print.registration', compact('registration'));
 })->name('registration.print');
-
-Route::get('/admin/report/{eventId}/print-xml', function ($eventId) {
-    $report = new \App\Filament\Pages\Report();
-    return $report->printXml($eventId);
-})->name('report.print-xml');

@@ -16,18 +16,29 @@ class RegistrationWidget extends BaseWidget
     {
         $user = Auth::user();
 
-        $allowedEventIds = $user->role->name === 'superadmin'
-            ? Event::where('status', 'OPEN')->pluck('events.id')->toArray() // semua event
-            : $user->events()->where('status', 'OPEN')->pluck('events.id')->toArray();
-        // Ambil semua registrasi paid
+        // Tentukan event IDs yang diizinkan berdasarkan role user
+        if ($user->role?->name === 'superadmin') {
+            // Superadmin melihat semua event dengan status OPEN
+            $allowedEventIds = Event::where('status', 'OPEN')->pluck('id')->toArray();
+        } else {
+            // User lain hanya melihat event yang dimilikinya dengan status OPEN
+            $allowedEventIds = $user->events()->where('events.status', 'OPEN')->pluck('events.id')->toArray();
+        }
+
+        // Jika tidak ada event yang diizinkan, kembalikan array kosong
+        if (empty($allowedEventIds)) {
+            return [];
+        }
+
+        // Ambil semua registrasi paid untuk event yang diizinkan
         $registrations = Registration::with([
             'categoryTicketType.category',
             'categoryTicketType.ticketType',
             'categoryTicketType.category.event'
             ])
             ->where('payment_status', 'paid')
-            ->when($allowedEventIds, fn($q) => 
-                $q->whereHas('categoryTicketType.category', fn($q) => $q->whereIn('event_id', $allowedEventIds))
+            ->whereHas('categoryTicketType.category', fn($q) => 
+                $q->whereIn('event_id', $allowedEventIds)
             )
             ->get();
 

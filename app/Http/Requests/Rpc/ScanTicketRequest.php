@@ -48,12 +48,3 @@ class ScanTicketRequest extends FormRequest
 
 
 
-
-
-
-
-
-
-
-
-

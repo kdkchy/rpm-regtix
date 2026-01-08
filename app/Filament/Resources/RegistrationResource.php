@@ -32,6 +32,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\RelationNotFoundException;
 use Illuminate\Support\Facades\Auth;
 
 class RegistrationResource extends Resource
@@ -194,8 +195,7 @@ class RegistrationResource extends Resource
                     ->color(fn($record) => self::getEmailStatusColor($record))
                     ->tooltip(fn($record) => self::getEmailStatusTooltip($record))
                     ->formatStateUsing(fn($record) => self::getEmailStatusLabel($record))
-                    ->sortable()
-                    ->searchable(),
+                    ->sortable(false),
                 // Status RPC
                 TextColumn::make('is_validated')
                     ->badge()
@@ -400,7 +400,11 @@ class RegistrationResource extends Resource
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->label('Delete Selected (Unpaid will be backed up)')
+                        ->modalHeading('Delete Selected Registrations')
+                        ->modalDescription('Unpaid registrations will be automatically backed up to registration_backups table before deletion. Paid registrations will also be backed up with a warning. Are you sure?')
+                        ->modalSubmitActionLabel('Yes, Delete'),
                 ExportBulkAction::make()
                     ->visible(fn(): bool => in_array(Auth::user()->role->name, ['superadmin', 'admin']))
                     ->label('Export Selected')
@@ -421,7 +425,13 @@ class RegistrationResource extends Resource
      */
     private static function getEmailStatusIcon($record): ?string
     {
-        $emailLog = $record->latestEmailLog;
+        try {
+            $emailLog = $record->latestEmailLog ?? null;
+        } catch (RelationNotFoundException $e) {
+            $emailLog = null;
+        } catch (\Exception $e) {
+            $emailLog = null;
+        }
         
         if (!$emailLog) {
             return 'heroicon-o-envelope';
@@ -442,7 +452,13 @@ class RegistrationResource extends Resource
      */
     private static function getEmailStatusColor($record): string
     {
-        $emailLog = $record->latestEmailLog;
+        try {
+            $emailLog = $record->latestEmailLog ?? null;
+        } catch (RelationNotFoundException $e) {
+            $emailLog = null;
+        } catch (\Exception $e) {
+            $emailLog = null;
+        }
         
         if (!$emailLog) {
             return 'gray';
@@ -462,7 +478,13 @@ class RegistrationResource extends Resource
      */
     private static function getEmailStatusLabel($record): string
     {
-        $emailLog = $record->latestEmailLog;
+        try {
+            $emailLog = $record->latestEmailLog ?? null;
+        } catch (RelationNotFoundException $e) {
+            $emailLog = null;
+        } catch (\Exception $e) {
+            $emailLog = null;
+        }
         
         if (!$emailLog) {
             return 'No Status';
@@ -485,7 +507,13 @@ class RegistrationResource extends Resource
      */
     private static function getEmailStatusTooltip($record): ?string
     {
-        $emailLog = $record->latestEmailLog;
+        try {
+            $emailLog = $record->latestEmailLog ?? null;
+        } catch (RelationNotFoundException $e) {
+            $emailLog = null;
+        } catch (\Exception $e) {
+            $emailLog = null;
+        }
         
         if (!$emailLog) {
             return 'Belum ada log email';
@@ -534,7 +562,10 @@ class RegistrationResource extends Resource
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        $query = parent::getEloquentQuery()->with('latestEmailLog');
+        $query = parent::getEloquentQuery();
+        
+        // Note: latestEmailLog relationship is not loaded to avoid errors if it doesn't exist
+        // Each method that uses latestEmailLog will handle it safely with try-catch
 
         // Admin bisa lihat semua
         if ($user->role->name === 'superadmin') {

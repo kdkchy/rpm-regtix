@@ -50,12 +50,3 @@ class ValidateRequest extends FormRequest
 
 
 
-
-
-
-
-
-
-
-
-
