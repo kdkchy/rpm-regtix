@@ -57,6 +57,50 @@ Thank you for considering contributing to the Laravel framework! The contributio
 
 In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
 
+## Development Workflow
+
+This project uses a **Simple Branch Strategy** for development:
+
+### Branch Structure
+
+- **`main/master`** - Production-ready code. This branch should always be stable and deployable.
+- **`development`** - Development branch for ongoing work (optional, can work directly from main).
+- **`feature/nama-fitur`** - Feature branches created from main/master for each new feature or change.
+
+### Workflow Steps
+
+1. **Start a new feature:**
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout -b feature/nama-fitur
+   ```
+
+2. **Make your changes:**
+   - Work on your feature branch
+   - Commit regularly with clear messages
+
+3. **When feature is complete:**
+   ```bash
+   git checkout main
+   git pull origin main
+   git merge feature/nama-fitur
+   git push origin main
+   ```
+
+4. **Clean up:**
+   ```bash
+   git branch -d feature/nama-fitur
+   ```
+
+### Best Practices
+
+- Always create a new branch for each feature/bugfix
+- Keep main/master branch clean and stable
+- Test your changes before merging to main
+- Write clear commit messages
+- Sync with remote regularly
+
 ## Security Vulnerabilities
 
 If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.

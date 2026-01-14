@@ -7,10 +7,20 @@ use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
+use Illuminate\Database\Eloquent\Builder;
 
 class RegistrationExporter extends Exporter
 {
     protected static ?string $model = Registration::class;
+
+    public static function modifyQuery(Builder $query): Builder
+    {
+        return $query->with([
+            'categoryTicketType.category',
+            'categoryTicketType.ticketType',
+            'voucherCode.voucher',
+        ]);
+    }
 
     public static function getColumns(): array
     {
@@ -18,8 +28,16 @@ class RegistrationExporter extends Exporter
             ExportColumn::make('id')
                 ->label('ID'),
             ExportColumn::make('registration_code')->label('Kode Tiket'),
-            ExportColumn::make('categoryTicketType.category.name')->label('Kategory'),
-            ExportColumn::make('categoryTicketType.ticketType.name')->label('Tipe Tiket'),
+            ExportColumn::make('category_name')
+                ->label('Kategory')
+                ->getStateUsing(function (Registration $record) {
+                    return $record->categoryTicketType?->category?->name ?? '';
+                }),
+            ExportColumn::make('ticket_type_name')
+                ->label('Tipe Tiket')
+                ->getStateUsing(function (Registration $record) {
+                    return $record->categoryTicketType?->ticketType?->name ?? '';
+                }),
             ExportColumn::make('full_name')->label('Nama'),
             ExportColumn::make('email')->label('Email'),
             ExportColumn::make('phone')->label('Nomor HP'),
@@ -41,14 +59,27 @@ class RegistrationExporter extends Exporter
             ExportColumn::make('bib_name')->label('Nama BIB'),
             ExportColumn::make('reg_id')->label('Nomer Registrasi'),
             ExportColumn::make('registration_date')->label('Tanggal Registrasi'),
-            ExportColumn::make('gross_amount')->label('Gross Amount')
-            ->formatStateUsing(function(Registration $record){
-                return $record->voucherCode?->voucher?->final_price ?? $record->categoryTicketType?->price ?? 0;
-            }),
-            ExportColumn::make('invitation_code')->label('Kode Voucher')
-            ->formatStateUsing(function(Registration $record){
-                return $record->voucherCode?->code ?? "";
-            }),
+            ExportColumn::make('gross_amount_calc')
+                ->label('Gross Amount')
+                ->getStateUsing(function(Registration $record){
+                    try {
+                        if ($record->voucherCode && $record->voucherCode->voucher) {
+                            return $record->voucherCode->voucher->final_price ?? 0;
+                        }
+                        return $record->categoryTicketType?->price ?? 0;
+                    } catch (\Exception $e) {
+                        return 0;
+                    }
+                }),
+            ExportColumn::make('voucher_code_value')
+                ->label('Kode Voucher')
+                ->getStateUsing(function(Registration $record){
+                    try {
+                        return $record->voucherCode?->code ?? "";
+                    } catch (\Exception $e) {
+                        return "";
+                    }
+                }),
         ];
     }
 
