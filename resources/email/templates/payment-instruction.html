@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>regTix - Registration Confirmation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7fa;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .email-header {
+            background-color: #031329;
+            color: #ffffff;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .email-header img {
+            width: 120px;
+            margin-bottom: -10px;
+        }
+
+        .email-body {
+            padding: 24px 32px;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 30px;
+            color: #004aad;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .info {
+            font-size: 14px;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .highlight {
+            color: #004aad;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .section-divider {
+            border-top: 1px solid #dbe3ec;
+            margin: 20px 0;
+        }
+
+        .details-table {
+            width: 100%;
+            font-size: 14px;
+            border-collapse: collapse;
+        }
+
+        .details-table td {
+            padding: 6px 0;
+            vertical-align: top;
+        }
+
+        .details-table td.label {
+            font-weight: bold;
+            color: #004aad;
+            width: 40%;
+        }
+
+        .ticket-summary,
+        .ticket-details,
+        .rpc-details {
+            margin-bottom: 20px;
+        }
+
+        .summary-box {
+            width: 100%;
+            font-size: 14px;
+            color: #1976d2;
+            font-family: sans-serif;
+        }
+
+        .summary-box td {
+            padding: 3px 0;
+        }
+
+        .summary-box td:last-child {
+            text-align: right;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .label-title {
+            font-size: 14px;
+            color: #1976d2;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .label-price {
+            font-size: 28px;
+            color: #1976d2;
+            font-weight: bold;
+        }
+
+        .qr-code {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .qr-code img {
+            width: 160px;
+            height: auto;
+            border: 8px solid #f0f4f8;
+            border-radius: 8px;
+        }
+
+        .email-footer {
+            background-color: #f0f4f8;
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            padding: 16px;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .email-body {
+                padding: 20px;
+            }
+        }
+
+        .button {
+            display: inline-block;
+            margin: 16px 0;
+            padding: 14px 26px;
+            background: #0ea5e9;
+            color: white !important;
+            text-decoration: none;
+            font-weight: bold;
+            border-radius: 8px;
+            transition: background 0.3s ease;
+        }
+
+        .button:hover {
+            background: rgb(245, 158, 0);
+        }
+
+        .button-secondary {
+            background: rgb(245, 158, 11);
+        }
+
+        .button-secondary:hover {
+            background: rgb(245, 158, 0);
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-size: 14px;
+        }
+
+        .table th,
+        .table td {
+            border: 1px solid #e5e7eb;
+            padding: 12px;
+            text-align: left;
+        }
+
+        .table th {
+            background-color: #f3f4f6;
+            font-weight: 600;
+        }
+
+    </style>
+</head>
+
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <img src="https://rpm.regtix.id/images/logo.png" alt="RegTix logo" />
+        </div>
+        <div class="email-body">
+            <h2>Halo {{params.name}}</h2>
+            <p>Silakan selesaikan pembayaran terlebih dahulu dengan langkah-langkah berikut:</p>
+            
+            <div class="highlight-box">
+                1. Klik tombol <strong>Bayar Sekarang</strong> di bawah ini.<br />
+                2. Pilih metode pembayaran yang tersedia.<br />
+                3. Selesaikan pembayaran sebelum batas waktu yang ditentukan.
+            </div>
+
+            <p style="text-align: center; margin: 30px 0;">
+                <a href="{{params.payment_url}}" class="button" style="background-color: rgb(245, 158, 11);">Bayar
+                    Sekarang</a>
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
+
+            <div class="highlight-box" style="text-align: center;">
+                Kode Pendaftaran Anda:<br />
+                <strong>{{ params.registration_code }}</strong>
+            </div>
+
+            <h3>Rincian Pemesanan</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Jumlah</th>
+                        <th>Harga</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ params.item }}</td>
+                        <td>1</td>
+                        <td>{{ params.price }}</td>
+                    </tr>
+                    <tr>
+                        <td>{{params.voucher}}</td>
+                        <td></td>
+                        <td>{{params.price_reduction}}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><strong>Total</strong></td>
+                        <td><strong>{{ params.final_price }}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>Setelah pembayaran diterima, tiket Anda akan dikirim otomatis ke email ini.</p>
+            <p>Untuk memeriksa status pembayaran, klik tautan berikut:</p>
+
+            <p style="text-align: center;">
+                <a href="{{ params.cek_registrasi }}" class="button button-secondary">🔍 Cek Status Pembayaran</a>
+            </p>
+
+            <p>Jika mengalami kendala, silakan hubungi tim kami melalui email atau WhatsApp.</p>
+        </div>
+
+        <div class="email-footer">
+            &copy; {{ params.year }} regTIX &mdash; All rights reserved.
+        </div>
+    </div>
+</body>
+
+</html>

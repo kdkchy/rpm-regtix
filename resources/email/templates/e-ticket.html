@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>regTix - eTicket</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #f4f7fa;
+        margin: 0;
+        padding: 20px;
+        color: #333;
+      }
+      .email-container {
+        max-width: 600px;
+        margin: auto;
+        background-color: #ffffff;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      }
+      .email-header {
+        color: #ffffff;
+        text-align: center;
+        padding: 20px;
+      }
+      .email-header img {
+        width: 280px;
+        margin-bottom: -50px;
+      }
+      .email-body {
+        padding: 24px 32px;
+      }
+      .title {
+        text-align: center;
+        font-size: 30px;
+        color: #004aad;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .info {
+        font-size: 14px;
+        margin-bottom: 20px;
+        line-height: 1;
+      }
+      .terms {
+        font-size: 14px;
+        margin-bottom: 20px;
+        line-height: 1;
+        text-align: justify;
+      }
+      .highlight {
+        color: #004aad;
+        font-size: 18px;
+        font-weight: bold;
+      }
+      .section-divider {
+        border-top: 1px solid #dbe3ec;
+        margin: 20px 0;
+      }
+      .details-table {
+        width: 100%;
+        font-size: 14px;
+        border-collapse: collapse;
+      }
+      .details-table td {
+        padding: 6px 0;
+        vertical-align: top;
+      }
+      .details-table td.label {
+        font-weight: bold;
+        color: #004aad;
+        width: 40%;
+      }
+      .ticket-summary,
+      .rpc-details {
+        margin-bottom: 20px;
+      }
+      .ticket-details {
+        padding: 10px;
+        margin-bottom: 20px;
+        line-height: 1;
+      }
+      .summary-box {
+        width: 100%;
+        font-size: 14px;
+        color: #1976d2;
+        font-family: sans-serif;
+      }
+      .summary-box td {
+        padding: 3px 0;
+      }
+      .summary-box td:last-child {
+        text-align: right;
+      }
+      .center {
+        text-align: center;
+      }
+      .bg-content {
+        background: #cccccc;
+      }
+      .label-title {
+        font-size: 14px;
+        color: #1976d2;
+        margin-bottom: 4px;
+        font-weight: 500;
+      }
+      .label-price {
+        font-size: 28px;
+        color: #1976d2;
+        font-weight: bold;
+      }
+      .qr-code {
+        text-align: center;
+        margin-top: 30px;
+      }
+      .qr-code img {
+        width: 160px;
+        height: auto;
+        border: 8px solid #f0f4f8;
+        border-radius: 8px;
+      }
+      .email-footer {
+        background-color: #f0f4f8;
+        text-align: center;
+        font-size: 12px;
+        color: #777;
+        padding: 16px;
+      }
+      @media only screen and (max-width: 600px) {
+        .email-body {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="email-container">
+      <div class="email-header">
+        <img
+          src="https://rpm.regtix.id/images/logo.png?v=2"
+          alt="RegTix logo"
+        />
+      </div>
+
+      <div class="email-body">
+        <div class="qr-code">
+          <img src="{{ params.qr_code_path }}" alt="QR Code" />
+          <h3>{{ params.registration_code }}</h3>
+        </div>
+
+        <div class="center">
+          <div class="info">
+            <strong>THIS IS YOUR ETICKET</strong>
+            <div class="title">{{ params.event }}</div>
+            <p><strong>{{ params.location }}</strong></p>
+            <strong>Race Day :</strong> {{ params.event_date }}
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="ticket-details bg-content">
+          <table class="details-table">
+            <tr>
+              <td class="label">Name</td>
+              <td>{{ params.name }}</td>
+            </tr>
+            <tr>
+              <td class="label">Email</td>
+              <td>{{ params.email }}</td>
+            </tr>
+            <tr>
+              <td class="label">Category</td>
+              <td>{{ params.ticket }} - {{ params.category }}</td>
+            </tr>
+            <tr>
+              <td class="label">Distance</td>
+              <td>{{ params.distance }}</td>
+            </tr>
+            <tr>
+              <td class="label">Price</td>
+              <td>{{ params.final_price }}</td>
+            </tr>
+            <tr>
+              <td class="label">Jersey Size</td>
+              <td>{{ params.jersey_size}}</td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="terms">
+          <h4>Liability Waiver and Release Agreement</h4>
+            <p>I, the undersigned Participant, hereby declare my willing and voluntary desire to participate in the {{ params.event }}. I acknowledge and understand that this athletic activity may test a person's physical and mental limits and carries with it the risks of death, serious injury, and property damage. These risks include, but are not limited to, those caused by: terrain, facilities, temperature, weather, my condition as a runner, lack of hydration, equipment, vehicular traffic, and the actions of other people, including but not limited to, participants, volunteers, spectators, and event organizers.
+          </p>
+          <p>
+            I hereby assume all risks of my participation in this Event. I acknowledge that this Release and Waiver of Liability will be used by the Event Organizer and Race Management, and that it will govern my actions and responsibilities at this Event. I have carefully read and fully understand the terms of this agreement. I am aware that this is a release of liability, and I covenant not to sue the Event Organizer and Race Management. This Release and Waiver of Liability shall be binding upon my heirs, executors, personal representatives, and all members of my family, including any minors.
+          </p>
+          <p>
+            By registering, I acknowledge that I have read and fully understand the contents of this Statement of Release of Liability and affirm that it is executed of my own free will and without any coercion or duress from any party whatsoever.
+          </p>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="terms">
+          <h4>Perjanjian Pembebasan Tanggung Jawab dan Pelepasan Hak</h4>
+            <p>Saya sebagai Peserta dengan kesadaran sendiri ingin berpartisipasi dalam event {{ params.event }}. Saya mengakui bahwa kegiatan atletik ini dapat menguji batas fisik dan mental seseorang serta memiliki risiko kematian, luka-luka dan kerugian harta benda. Risiko meliputi, tetapi tidak terbatas pada, yang disebabkan oleh medan, fasilitas, suhu, cuaca, kondisi pelari, kurangnya hidrasi, peralatan, lalu lintas kendaraan, dan tindakan orang lain, termasuk tidak terbatas pada peserta, relawan, penonton, dan panitia acara. 
+          </p>
+          <p>
+            Dengan ini, saya menanggung sendiri semua risiko partisipasi dalam Event ini. Saya mengakui bahwa Pelepasan dan Pembebasan Tanggung Jawab akan digunakan oleh Penyelenggara dan Pengelola Acara dan dan bahwa hal itu akan mengatur tindakan dan tanggung jawab saya di acara ini. Saya telah membaca dengan seksama dan memahami perjanjian ini. Saya sadar bahwa ini adalah pelepasan dari tanggung jawab, dan saya berjanji untuk tidak menuntut Penyelenggara dan Pengelola Acara. Pelepasan dan Pembebasan Tanggung Jawab ini akan mengikat, ahli waris, wakil pribadi, dan semua anggota keluarga saya, termasuk anak di bawah umur.
+          </p>
+          <p>
+            Dengan mendaftar, saya telah membaca dan mengerti isi dari Pernyataan Pelepasan Tanggung Jawab ini serta mengakui dilakukan atas kemauan saya sendiri dan tanpa adanya paksaan dari pihak manapun.
+          </p>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="info">
+          Contact Information :<br>
+          Regtix Customer Care Call/WA: <a href="https://wa.me/6287794250227" target="_blank">+62 877-9425-0227</a><br>
+          {{ params.event }} : <br>
+          {% if params.ig_url%}
+          IG : <a href="{{ params.ig_url}}" target="_blank">Instagram</a>  <br>
+          {% endif %}
+          {% if params.fb_url %}       
+          FB : <a href="{{ params.fb_url }}" target="_blank">Facebook</a> <br>        
+          {% endif %}
+          {% if params.event_callwa %}       
+          WA : <a href="https://wa.me/{{ params.event_callwa }}" target="_blank">{{ params.event_callwa }}</a><br>        
+          {% endif %}
+  
+        </div>
+
+      <div class="email-footer">
+        &copy; {{ params.year }} regTIX &mdash; All rights reserved.
+      </div>
+    </div>
+  </body>
+</html>

