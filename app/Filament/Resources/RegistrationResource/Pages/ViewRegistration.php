@@ -7,6 +7,9 @@ use App\Helpers\EmailSender;
 use Filament\Actions;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Auth;
@@ -15,8 +18,41 @@ class ViewRegistration extends EditRecord
 {
     protected static string $resource = RegistrationResource::class;
 
+    public static function canAccess(array $parameters = []): bool
+    {
+        // Semua user yang login bisa akses view page
+        return Auth::check();
+    }
+
+    protected function authorizeAccess(): void
+    {
+        // Override authorization - selalu izinkan view meskipun edit locked
+        // canView() sudah return true di Resource
+    }
+
+    public function mount(int | string $record): void
+    {
+        parent::mount($record);
+        
+        $user = Auth::user();
+        $event = $this->record->categoryTicketType?->category?->event;
+        
+        // Jika bukan superadmin dan registration locked, tampilkan notification
+        if ($user->role->name !== 'superadmin' && $event && !($event->allow_registration_edit ?? true)) {
+            Notification::make()
+                ->title('Data Peserta Dikunci')
+                ->body('Data peserta dikunci oleh sistem. Jika ingin melakukan perubahan, hubungi pihak RegTix.')
+                ->warning()
+                ->persistent()
+                ->send();
+        }
+    }
+
     protected function getHeaderActions(): array
     {
+        $user = Auth::user();
+        $isSuperAdmin = $user->role->name === 'superadmin';
+        
         return [
             Actions\DeleteAction::make()
                 ->label(fn($record) => $record->payment_status !== 'paid' ? 'Delete (Will be backed up)' : 'Delete')
@@ -27,13 +63,18 @@ class ViewRegistration extends EditRecord
                     ? 'This unpaid registration will be backed up to registration_backups table before deletion. Are you sure you want to delete this registration?'
                     : 'WARNING: This is a PAID registration. It will be backed up before deletion. Are you sure you want to proceed?')
                 ->modalSubmitActionLabel('Yes, Delete')
-                ->color(fn($record) => $record->payment_status === 'paid' ? 'danger' : 'warning'),
+                ->color(fn($record) => $record->payment_status === 'paid' ? 'danger' : 'warning')
+                ->visible($isSuperAdmin),
         ];
     }
 
     protected function getFormActions(): array
     {
-        return [
+        $user = Auth::user();
+        $event = $this->record->categoryTicketType?->category?->event;
+        $isLocked = $user->role->name !== 'superadmin' && $event && !($event->allow_registration_edit ?? true);
+        
+        $actions = [
             Action::make('send_email')
                 ->label('Send Email')
                 ->icon('heroicon-o-envelope')
@@ -68,6 +109,7 @@ class ViewRegistration extends EditRecord
                 ->icon('heroicon-m-inbox-arrow-down')
                 ->requiresConfirmation()
                 ->color('success')
+                ->disabled($isLocked)
                 ->action(function ($record, $livewire) {
                     // Validasi form terlebih dahulu
                     $data = $livewire->form->getState();
@@ -87,6 +129,7 @@ class ViewRegistration extends EditRecord
                 ->requiresConfirmation()
                 ->color('success')
                 ->visible(fn($record) => !$record->is_validated)
+                ->disabled($isLocked)
                 ->action(function ($record, $livewire) {
                     // Validasi form terlebih dahulu
                     $data = $livewire->form->getState();
@@ -110,6 +153,7 @@ class ViewRegistration extends EditRecord
                 ->modalSubmitActionLabel('Yes, Revert')
                 ->color('warning')
                 ->visible(fn($record) => $record->is_validated)
+                ->disabled($isLocked)
                 ->action(function ($record) {
                     $record->update([
                         'is_validated' => false,
@@ -132,8 +176,9 @@ class ViewRegistration extends EditRecord
                     return $record->is_validated;
                 }),
 
-
             $this->getCancelFormAction(),
         ];
+
+        return $actions;
     }
 }

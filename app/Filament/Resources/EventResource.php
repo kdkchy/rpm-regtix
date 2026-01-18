@@ -16,6 +16,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Support\RawJs;
@@ -187,7 +188,9 @@ class EventResource extends Resource
                                             '16:9',
                                             '4:3',
                                             '1:1',
-                                        ]),
+                                        ])
+                                        ->dehydrated(fn($state) => filled($state))
+                                        ->required(fn($get, $record) => !$record || empty($record->image_path)),
                                         TextInput::make('caption')
                                             ->label('Caption')
                                             ->maxLength(255),
@@ -262,7 +265,24 @@ class EventResource extends Resource
                             ->columns(2),
                     ])
                     ->collapsible()
+                    ->collapsed(true),
+                Section::make('Edit Authorization')
+                    ->description('Control who can edit this event and its registrations. Only superadmin can modify these settings.')
+                    ->schema([
+                        Toggle::make('allow_event_edit')
+                            ->label('Allow Event Edit')
+                            ->helperText('When disabled, no one (except superadmin) can edit this event.')
+                            ->default(true)
+                            ->visible(fn() => Auth::user()?->role?->name === 'superadmin'),
+                        Toggle::make('allow_registration_edit')
+                            ->label('Allow Registration Edit')
+                            ->helperText('When disabled, no one (except superadmin) can edit registrations for this event.')
+                            ->default(true)
+                            ->visible(fn() => Auth::user()?->role?->name === 'superadmin'),
+                    ])
+                    ->collapsible()
                     ->collapsed(true)
+                    ->visible(fn() => Auth::user()?->role?->name === 'superadmin')
             ]);
     }
 
@@ -289,12 +309,34 @@ class EventResource extends Resource
                 ->label('Status')
                 ->searchable()
                 ->sortable(),
+            TextColumn::make('allow_event_edit')
+                ->label('Event Edit')
+                ->badge()
+                ->formatStateUsing(fn($state) => $state ? 'Allowed' : 'Locked')
+                ->color(fn($state) => $state ? 'success' : 'danger')
+                ->icon(fn($state) => $state ? 'heroicon-o-lock-open' : 'heroicon-o-lock-closed')
+                ->sortable(),
+            TextColumn::make('allow_registration_edit')
+                ->label('Registration Edit')
+                ->badge()
+                ->formatStateUsing(fn($state) => $state ? 'Allowed' : 'Locked')
+                ->color(fn($state) => $state ? 'success' : 'danger')
+                ->icon(fn($state) => $state ? 'heroicon-o-lock-open' : 'heroicon-o-lock-closed')
+                ->sortable(),
             TextColumn::make('size')
                 ->label('Size')
                 ->searchable()
                 ->sortable(),
                 TextColumn::make('location')
                     ->label('Location')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('createdBy.name')
+                    ->label('Created By')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('updatedBy.name')
+                    ->label('Updated By')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('code_prefix')
@@ -368,6 +410,19 @@ class EventResource extends Resource
     public static function canViewAny(): bool
     {
         return in_array(Auth::user()->role->name, ['superadmin', 'admin']);
+    }
+
+    public static function canEdit($record): bool
+    {
+        $user = Auth::user();
+        
+        // Superadmin selalu bisa edit
+        if ($user->role->name === 'superadmin') {
+            return true;
+        }
+        
+        // Cek flag allow_event_edit
+        return $record->allow_event_edit ?? true;
     }
 
     public static function getEloquentQuery(): Builder

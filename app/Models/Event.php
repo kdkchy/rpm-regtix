@@ -49,7 +49,11 @@ class Event extends Model
         'jersey_size_image',
         'slug',
         'status',
-        'size'
+        'size',
+        'created_by',
+        'updated_by',
+        'allow_event_edit',
+        'allow_registration_edit',
     ];
 
 
@@ -77,8 +81,28 @@ class Event extends Model
         return $this->hasMany(EventSlide::class);
     }
 
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updatedBy()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
     protected static function booted()
     {
+        static::creating(function (Event $event) {
+            $userId = auth()->id() ?? User::systemUserId();
+            $event->created_by = $event->created_by ?? $userId;
+            $event->updated_by = $event->updated_by ?? $userId;
+        });
+
+        static::updating(function (Event $event) {
+            $event->updated_by = auth()->id() ?? User::systemUserId();
+        });
+
         static::created(function ($event) {
             // Pindah logo, banner, jersey
             foreach ([

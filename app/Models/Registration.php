@@ -73,8 +73,23 @@ class Registration extends Model
         'paid_at',
         'payment_token',
         'payment_url',
-        'qr_code_path'
+        'qr_code_path',
+        'created_by',
+        'updated_by',
     ];
+
+    protected static function booted()
+    {
+        static::creating(function (Registration $registration) {
+            $userId = auth()->id() ?? User::systemUserId();
+            $registration->created_by = $registration->created_by ?? $userId;
+            $registration->updated_by = $registration->updated_by ?? $userId;
+        });
+
+        static::updating(function (Registration $registration) {
+            $registration->updated_by = auth()->id() ?? User::systemUserId();
+        });
+    }
 
     public function categoryTicketType()
     {
@@ -103,6 +118,16 @@ class Registration extends Model
     public function validator()
     {
         return $this->belongsTo(User::class, 'validated_by');
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updatedBy()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     public function campaigns()

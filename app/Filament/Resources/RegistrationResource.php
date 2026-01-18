@@ -181,7 +181,21 @@ class RegistrationResource extends Resource
 
             Hidden::make('registration_date')
                     ->default(now())
-            ]);
+            ])
+            ->disabled(function ($record) {
+                $user = Auth::user();
+                // Disable form jika locked (kecuali superadmin)
+                if ($user->role->name === 'superadmin') {
+                    return false;
+                }
+                
+                $event = $record?->categoryTicketType?->category?->event;
+                if ($event && !($event->allow_registration_edit ?? true)) {
+                    return true;
+                }
+                
+                return false;
+            });
     }
 
     public static function table(Table $table): Table
@@ -196,21 +210,6 @@ class RegistrationResource extends Resource
                     ->tooltip(fn($record) => self::getEmailStatusTooltip($record))
                     ->formatStateUsing(fn($record) => self::getEmailStatusLabel($record))
                     ->sortable(false),
-                // Status RPC
-                TextColumn::make('is_validated')
-                    ->badge()
-                    ->icon(fn($record) => $record->is_validated ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
-                    ->formatStateUsing(fn($state) => $state ? 'Validated' : 'Not Validated')
-                    ->color(fn($record) => $record->is_validated ? 'success' : 'danger')
-                    ->label('Status RPC')
-                    ->sortable()
-                    ->searchable(),
-                // Registration Date
-                TextColumn::make('registration_date')
-                    ->label('Registration Date')
-                    ->sortable()
-                    ->searchable()
-                    ->dateTime(),
                 // Payment Status
                 TextColumn::make('payment_status')
                     ->label('Payment Status')
@@ -260,20 +259,59 @@ class RegistrationResource extends Resource
                     ->label('BIB')
                     ->sortable()
                     ->searchable(),
+                // Registration Date (sebelum Created By)
+                TextColumn::make('registration_date')
+                    ->label('Registration Date')
+                    ->sortable()
+                    ->searchable()
+                    ->dateTime(),
+                // Created By (paling akhir - 3)
+                TextColumn::make('createdBy.name')
+                    ->label('Created By')
+                    ->sortable()
+                    ->searchable(),
+                // Updated By (paling akhir - 2)
+                TextColumn::make('updatedBy.name')
+                    ->label('Updated By')
+                    ->sortable()
+                    ->searchable(),
+                // Edit Lock Status (paling akhir - 1)
+                TextColumn::make('edit_lock_status')
+                    ->label('Edit Lock')
+                    ->badge()
+                    ->formatStateUsing(function ($record) {
+                        $event = $record->categoryTicketType?->category?->event;
+                        if ($event) {
+                            return $event->allow_registration_edit ?? true ? 'Allowed' : 'Locked';
+                        }
+                        return 'Unknown';
+                    })
+                    ->color(function ($record) {
+                        $event = $record->categoryTicketType?->category?->event;
+                        if ($event) {
+                            return ($event->allow_registration_edit ?? true) ? 'success' : 'danger';
+                        }
+                        return 'gray';
+                    })
+                    ->icon(function ($record) {
+                        $event = $record->categoryTicketType?->category?->event;
+                        if ($event) {
+                            return ($event->allow_registration_edit ?? true) ? 'heroicon-o-lock-open' : 'heroicon-o-lock-closed';
+                        }
+                        return 'heroicon-o-question-mark-circle';
+                    })
+                    ->sortable(false),
+                // Status RPC (paling akhir)
+                TextColumn::make('is_validated')
+                    ->badge()
+                    ->icon(fn($record) => $record->is_validated ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
+                    ->formatStateUsing(fn($state) => $state ? 'Validated' : 'Not Validated')
+                    ->color(fn($record) => $record->is_validated ? 'success' : 'danger')
+                    ->label('Status RPC')
+                    ->sortable()
+                    ->searchable(),
             ])
             ->filters([
-            Filter::make('registration_code')
-                    ->columns(1)
-                    ->label('Registration ID')
-                    ->form([
-                TextInput::make('registration_code')
-                    ->label('Registration ID'),
-                    ])
-                    ->query(function (Builder $query, array $data) {
-                return $query->when($data['registration_code'], function ($query, $reg_id) {
-                    $query->where('registration_code', 'like', "%{$reg_id}%");
-                        });
-                    }),
             SelectFilter::make('event_id')
                 ->label('Event')
                 ->options(function () {
@@ -299,65 +337,163 @@ class RegistrationResource extends Resource
             SelectFilter::make('category_ticket_type_id')
                 ->label('Event Category - Ticket Type')
                 ->options(function () {
-                    $eventId = request('tableFilters')['event_id']['value'] ?? null;
-                /** @var \App\Models\User $user */
-
-                $user = Auth::user();
+                    // Ambil event_id dari berbagai sumber
+                    $eventId = null;
+                    
+                    // Cara 1: Dari request tableFilters (saat filter di-submit)
+                    $allRequest = request()->all();
+                    if (isset($allRequest['tableFilters']['event_id']['value'])) {
+                        $eventId = $allRequest['tableFilters']['event_id']['value'];
+                    }
+                    
+                    // Cara 2: Dari query string (format berbeda)
+                    if (!$eventId && request()->has('tableFilters')) {
+                        $tableFilters = request('tableFilters');
+                        if (is_array($tableFilters) && isset($tableFilters['event_id']['value'])) {
+                            $eventId = $tableFilters['event_id']['value'];
+                        }
+                    }
+                    
+                    // Cara 3: Dari session - Filament menyimpan dengan key: filament.resources.{resource}.table.filters
+                    if (!$eventId) {
+                        // Coba key yang lebih spesifik berdasarkan resource name
+                        $sessionKey = 'filament.resources.registrations.table.filters';
+                        $sessionFilters = session()->get($sessionKey, []);
+                        if (isset($sessionFilters['event_id']['value'])) {
+                            $eventId = $sessionFilters['event_id']['value'];
+                        } elseif (isset($sessionFilters['event_id']) && !is_array($sessionFilters['event_id'])) {
+                            // Format alternatif: langsung value tanpa nested array
+                            $eventId = $sessionFilters['event_id'];
+                        }
+                    }
+                    
+                    // Cara 4: Dari session - coba semua kemungkinan key yang mengandung filters
+                    if (!$eventId) {
+                        $allSession = session()->all();
+                        foreach ($allSession as $key => $value) {
+                            if ((str_contains($key, 'filters') || str_contains($key, 'table')) && is_array($value)) {
+                                if (isset($value['event_id']['value'])) {
+                                    $eventId = $value['event_id']['value'];
+                                    break;
+                                }
+                                // Cek nested array
+                                if (isset($value['event_id']) && is_array($value['event_id']) && isset($value['event_id']['value'])) {
+                                    $eventId = $value['event_id']['value'];
+                                    break;
+                                }
+                                // Format alternatif: langsung value
+                                if (isset($value['event_id']) && !is_array($value['event_id'])) {
+                                    $eventId = $value['event_id'];
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Cara 5: Dari URL query parameter langsung
+                    if (!$eventId) {
+                        $eventId = request()->query('tableFilters.event_id.value');
+                    }
+                    
+                    // Debug: Uncomment untuk debug jika masih bermasalah
+                    // \Log::info('Filter Category-Ticket Type Options', [
+                    //     'eventId' => $eventId,
+                    //     'hasTableFilters' => request()->has('tableFilters'),
+                    //     'tableFilters' => request('tableFilters'),
+                    //     'sessionKey' => 'filament.resources.registrations.table.filters',
+                    //     'sessionValue' => session()->get('filament.resources.registrations.table.filters', 'not found'),
+                    // ]);
+                    
+                    /** @var \App\Models\User $user */
+                    $user = Auth::user();
                     $query = CategoryTicketType::query()->with(['category.event', 'ticketType']);
 
-                if ($eventId) {
+                    // Jika event dipilih, filter berdasarkan event tersebut
+                    if ($eventId) {
                         $query->whereHas('category.event', function ($q) use ($eventId) {
                             $q->where('id', $eventId);
                         });
+                    } else {
+                        // Jika event belum dipilih, tampilkan semua (atau filter berdasarkan user events)
+                        if ($user->role->name !== 'superadmin') {
+                            $eventIds = $user->events()->pluck('events.id')->toArray();
+                            if (!empty($eventIds)) {
+                                $query->whereHas('category.event', function ($q) use ($eventIds) {
+                                    $q->whereIn('id', $eventIds);
+                                });
+                            } else {
+                                return [];
+                            }
+                        }
                     }
 
-                if ($user->role->name !== 'superadmin') {
-                    $eventIds = $user->events()->pluck('events.id')->toArray();
+                    // Jika bukan superadmin, pastikan event tersebut dimiliki user
+                    if ($user->role->name !== 'superadmin' && $eventId) {
+                        $eventIds = $user->events()->pluck('events.id')->toArray();
+                        if (!in_array($eventId, $eventIds)) {
+                            return [];
+                        }
+                    }
 
-                    $query->whereHas('category.event', function ($q) use ($eventIds) {
-                        $q->whereIn('id', $eventIds);
-                    });
-                }
-
-                return $query->get()->mapWithKeys(function ($record) {
+                    return $query->get()->mapWithKeys(function ($record) {
                         return [
-                        $record->id => $record->category->event->name
-                            . ' - ' . $record->category->name
-                            . ' - ' . $record->ticketType->name,
+                            $record->id => $record->category->event->name
+                                . ' - ' . $record->category->name
+                                . ' - ' . $record->ticketType->name,
                         ];
                     })->toArray();
+                })
+                ->query(function ($query, $state) {
+                    $query->when($state['value'] != null, function ($query) use ($state) {
+                        $query->where('category_ticket_type_id', $state['value']);
+                    });
+                }),
+            SelectFilter::make('payment_status')
+                ->label('Payment Status')
+                ->options([
+                    'paid' => 'Paid',
+                    'unpaid' => 'Unpaid',
+                ]),
+            SelectFilter::make('email_status')
+                ->label('Email Status')
+                ->options([
+                    'delivered' => 'Delivered',
+                    'sent' => 'Sent',
+                    'bounced' => 'Bounced',
+                    'hardBounce' => 'Hard Bounce',
+                    'softBounce' => 'Soft Bounce',
+                    'invalid' => 'Invalid',
+                    'error' => 'Error',
+                    'no_status' => 'No Status',
+                ])
+                ->query(function (Builder $query, array $data) {
+                    if (empty($data['value'])) {
+                        return $query;
+                    }
+
+                    $status = $data['value'];
+                    
+                    // Cek apakah ada relasi latestEmailLog, jika tidak skip filter
+                    try {
+                        if ($status === 'no_status') {
+                            return $query->whereDoesntHave('latestEmailLog');
+                        }
+
+                        return $query->whereHas('latestEmailLog', function ($q) use ($status) {
+                            $q->where('status', $status);
+                        });
+                    } catch (\Exception $e) {
+                        // Jika relasi tidak ada, return query tanpa filter
+                        return $query;
+                    }
                 }),
                 SelectFilter::make('is_validated')
-                    ->label('Status')
+                    ->label('Status RPC')
                     ->columns(1)
                     ->options([
                         '1' => 'Validated',
                         '0' => 'Not Validated',
                     ]),
-                Filter::make('start_date')
-                    ->columns(2)
-                    ->form([
-                        DatePicker::make('start_date')
-                            ->label('Start Date')
-                            ->placeholder('Select Start Date'),
-                    ])
-                    ->query(function (Builder $query, array $data) {
-                        return $query->when($data['start_date'], function ($query, $date) {
-                            $query->whereDate('registration_date', '>=', $date); // Pastikan field database benar
-                        });
-                    }),
-                Filter::make('end_date')
-                    ->columns(2)
-                    ->form([
-                        DatePicker::make('end_date')
-                            ->label('End Date')
-                            ->placeholder('Select End Date')
-                    ])
-                    ->query(function (Builder $query, array $data) {
-                        return $query->when($data['end_date'], function ($query, $date) {
-                            $query->whereDate('registration_date', '<=', $date); // Pastikan field database benar
-                        });
-                    }),
 
             ], layout: FiltersLayout::AboveContent)
             ->filtersFormColumns(3)
@@ -409,7 +545,8 @@ class RegistrationResource extends Resource
                         ->label('Delete Selected (Unpaid will be backed up)')
                         ->modalHeading('Delete Selected Registrations')
                         ->modalDescription('Unpaid registrations will be automatically backed up to registration_backups table before deletion. Paid registrations will also be backed up with a warning. Are you sure?')
-                        ->modalSubmitActionLabel('Yes, Delete'),
+                        ->modalSubmitActionLabel('Yes, Delete')
+                        ->visible(fn(): bool => Auth::user()->role->name === 'superadmin'),
                 ExportBulkAction::make()
                     ->visible(fn(): bool => in_array(Auth::user()->role->name, ['superadmin', 'admin']))
                     ->label('Export Selected')
@@ -560,6 +697,43 @@ class RegistrationResource extends Resource
             'edit' => Pages\EditRegistration::route('/{record}/edit'),
             'view' => Pages\ViewRegistration::route('/{record}'),
         ];
+    }
+
+    public static function canEdit($record): bool
+    {
+        $user = Auth::user();
+        
+        // Superadmin selalu bisa edit
+        if ($user->role->name === 'superadmin') {
+            return true;
+        }
+        
+        // Cek flag allow_registration_edit dari event terkait
+        $event = $record->categoryTicketType?->category?->event;
+        if ($event) {
+            return $event->allow_registration_edit ?? true;
+        }
+        
+        // Default allow jika event tidak ditemukan
+        return true;
+    }
+
+    public static function canViewAny(): bool
+    {
+        // Semua user yang login bisa view list
+        return Auth::check();
+    }
+
+    public static function canView($record): bool
+    {
+        // Semua user yang bisa view list, bisa view detail
+        return true;
+    }
+
+    public static function canDelete($record): bool
+    {
+        // Hanya superadmin yang bisa delete
+        return Auth::user()?->role?->name === 'superadmin';
     }
 
     public static function getEloquentQuery(): Builder

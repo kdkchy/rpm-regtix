@@ -15,6 +15,16 @@ class EventSlide extends Model
         'order',
     ];
 
+    protected static function booted()
+    {
+        static::updating(function (EventSlide $slide) {
+            // Jika image_path null atau empty saat update, preserve existing value
+            if (empty($slide->image_path) && $slide->exists) {
+                $slide->image_path = $slide->getOriginal('image_path');
+            }
+        });
+    }
+
     public function event()
     {
         return $this->belongsTo(Event::class);
