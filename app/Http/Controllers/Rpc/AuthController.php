@@ -20,7 +20,10 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request): JsonResponse|LoginResource
     {
-        $email = $request->email;
+        $email = trim($request->email);
+        if (!str_contains($email, '@')) {
+            $email = $email . '@regtix.id';
+        }
         $password = $request->password;
 
         // Cari user berdasarkan email
