@@ -255,6 +255,11 @@ class RegistrationResource extends Resource
                     ->label('Jersey Size')
                     ->sortable()
                     ->searchable(),
+                // BIB Name
+                TextColumn::make('bib_name')
+                    ->label('BIB')
+                    ->sortable()
+                    ->searchable(),
             ])
             ->filters([
             Filter::make('registration_code')
